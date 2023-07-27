@@ -1,0 +1,165 @@
+def d_isit(his_order, max_, island) :
+
+    sector = {'1': [0,5,0,5],  '2' : [0,5,5,10],  '3' : [0,5,10,15],
+              '4': [5,10,0,5],  '5' : [5,10,5,10],  '6' : [5,10,10,15],
+              '7': [10,15,0,5],'8' : [10,15,5,10],'9' : [10,15,10,15]}
+
+    isit = {}
+    if 'SURFACE' in his_order  :
+        ind = his_order.index('SURFACE') + 1
+        n_sect = his_order[ind]
+        max_['N'], max_['S'], max_['W'], max_['E'] = sector[n_sect]
+    elif 'SONAR' in his_order :
+        ind = str(his_order.index('SONAR') + 1)
+        n_sect = his_order[ind]
+        max_['N'], max_['S'], max_['W'], max_['E'] = sector[n_sect]
+    elif 'TORPEDO' in his_order :
+        n_ind = his_order.index('TORPEDO')
+        x, y =  int(his_order[n_ind + 1]), int(his_order[n_ind + 2])
+        max_['N'] = x - 4 
+        max_['S'] = x + 4 
+        max_['W'] = y - 4 
+        max_['E'] = y + 4
+    elif 'SILENCE' in his_order :
+        max_['S'] += 4 
+        max_['N'] -= 4 
+        max_['W'] -= 4 
+        max_['E'] += 4 
+        
+    if 'MOVE' in his_order and 'N' in his_order : 
+        max_['S'] -= 1
+        max_['N'] -= 1
+    elif 'MOVE' in his_order and 'S' in his_order : 
+        max_['S'] += 1 
+        max_['N'] += 1
+    elif 'MOVE' in his_order and 'W' in his_order : 
+        max_['E'] -= 1
+        max_['W'] -= 1
+    elif 'MOVE' in his_order and 'E' in his_order : 
+        max_['E'] += 1
+        max_['W'] += 1
+
+    count = 1
+    for x in range(max_['W'],max_['E']) :
+        for y in range(max_['N'],max_['S']) :
+            if (x,y) not in island : count += 1 
+    prob = round((1 / count), 2)
+
+    if 1 / 15 <= prob : decision = 'shoot'
+    else : decision = 'wait'
+    for y in range(height):
+        for x in range(width) :
+            if max_['N'] <= y < max_['S'] and max_['W'] <= x < max_['E'] and (x,y) not in island : isit[x,y] = prob ###
+            else : isit[x,y] = 'x'
+    return decision, max_, isit
+
+
+def wait(x, y, silence, island, already) :
+    dir_ = 'x'
+    range_x = list(map(lambda z : z + x, [1, 0, -1,  0]))
+    range_y = list(map(lambda z : z + y, [0, 1,  0, -1]))
+    direction = ['E', 'S', 'W', 'N']
+    table_1 = list(zip(range_x, range_y, direction))
+    passed, n_s, e_o, t_n_s, t_e_o = -50, 0, 0, 0, 0
+
+    for i in table_1 : 
+        if (i[0], i[1]) in island : continue
+        if (i[0], i[1]) in already : continue
+        if  i[0] < 0 or i[0] >= width or i[1] < 0 or i[1] >= height : continue
+        temp = 0
+        temp_a = 0
+        table_2 = [(k + i[0], l + i[1]) for k in range(-1, 2) for l in range(-1, 2)]
+        for j in table_2 :
+            if j in already : temp_a += 1            
+            if n_s + j[0] >= (width - 4) or e_o + j[1] >= (height - 4): temp -= 1
+            if j[0] <= 0 or j[0] >= width or j[1] <= 0 or j[1] >= height : temp -= 1
+            if j in island : 
+                temp -= 2
+            else : temp = temp + temp_a    
+        if temp >= passed :
+            passed = temp    
+            dir_ = i[2]
+            t_n_s = i[0]
+            t_e_o = i[1]
+    if dir_ == 'x' : 
+        return 'x', 'SURFACE'
+        n_s, e_o = 0, 0
+    else :
+        n_s += t_n_s
+        e_o += t_e_o
+        if silence == 0 : return 'o', f'SILENCE {dir_} 1'
+        else : return 'o', f'MOVE {dir_} SILENCE'
+
+def hunt(x, y, isit, already, torpedo) :
+    temp_isit = isit.copy()
+    range_x = list(map(lambda z : z + x, [1, 0, -1,  0]))
+    range_y = list(map(lambda z : z + y, [0, 1,  0, -1]))
+    direction = ['E', 'S', 'W', 'N']
+    table_1 = list(zip(range_x, range_y))
+    table_2 = list(zip(range_x, range_y, direction))
+    for i in range(2) :
+        for y1 in range(height):
+            for x1 in range(width) :
+                if isit[x1,y1] == 'x' : continue
+                for j in table_1 :
+                    try : isit[j] 
+                    except KeyError : continue
+                    if isit[j] == 'x' : continue
+                    else : temp_isit[x1,y1] += isit[j]
+    
+    temp = 0
+    tx, ty, dis_xy, dis_nxy = 0, 0, 0, 0
+    for i in isit :
+        if isit[i] == 'x' : continue
+        if abs(x-i[0]) + abs(y-i[1]) <= 1 : continue
+        elif temp_isit[i] >= temp :
+            temp = temp_isit[i]
+            tx, ty = i
+
+    r = ''
+    for i in table_2 :
+        nx, ny, dir_ = i[0], i[1], i[2]
+        if nx < 0 or nx > width or ny < 0 or ny > height : continue
+        if (nx,ny) in already or (nx,ny) in island : continue
+        dx, dy = abs(tx - x) - abs(tx- nx), abs(ty - y) - abs(ty - ny)
+        if dx + dy >= 0 :
+            r = dir_
+            dis_xy = abs(tx - x) + abs(ty - y)
+            dis_nxy = abs(tx - nx) + abs(ty - ny)
+
+    if 1 < dis_xy <= 4 and torpedo == 0 : res = 'o', f'TORPEDO {tx} {ty}'
+    elif 1 < dis_nxy <= 4 and torpedo == 0 : res = 'o', f'MOVE {r} | TORPEDO {tx} {ty}'
+    elif r == '' : res = 'x', 'SURFACE'
+    else : res = 'o', f'MOVE {r} TORPEDO'
+    return res
+
+width, height, my_id = [int(i) for i in input().split()]
+
+island, already = [],[]
+max_, max_['N'], max_['S'], max_['W'], max_['E'] = {}, 0, height, 0, width
+
+for y in range(height):
+    line = input()
+    for x in range(width) :
+        if line[x] == 'x' : island.append((x,y)) # x -> island else .
+r = (0,0)
+if (7,7) not in island : r = (7,7)
+elif (4,5) not in island : r = (4,5)
+elif (9,5) not in island : r = (9,5)
+elif (9,9) not in island : r = (9,9)
+elif (5,9) not in island : r = (5,9)
+else : r = (2,7)
+print(*r) 
+
+# game loop
+while True:
+    x, y, my_life, his_life, torpedo, sonar, silence, mc = [int(i) for i in input().split()]
+    sonar_result = input()
+    his_order = input().replace('|', ' ').split()
+    already.append((x,y))
+    decision, max_, isit = d_isit(his_order, max_, island)
+    if decision != 'wait' : z, result = hunt(x, y, isit, already, torpedo)
+    else : z, result = wait(x, y, silence, island, already)
+    if z == 'x' : already = []
+    print(result)
+        # f'| MSG {isit}'
