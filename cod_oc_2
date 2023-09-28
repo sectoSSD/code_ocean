@@ -1,0 +1,52 @@
+# usal function
+
+def add (tuple_1, tuple_2) :
+    return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
+
+def sector (x,y) :
+    sector = {'1': [0,5,0,5],  '2' : [0,5,5,10],  '3' : [0,5,10,15],
+              '4': [5,10,0,5],  '5' : [5,10,5,10],  '6' : [5,10,10,15],
+              '7': [10,15,0,5],'8' : [10,15,5,10],'9' : [10,15,10,15]}
+    for i in '123456789' :
+        if sector[i][0] <= x <= sector[i][1] and sector[i][2] <= y < sector[i][3] : return i
+    return 'x'
+
+def move (direction) :
+    step = { 'N' : (-1,0), 'S' : (1,0), 'E' : (0,1), 'O' : (0,-1),}
+    return step[direction]
+
+# parameters
+
+max_path = 5
+side = 15
+
+# map 
+
+width, height, my_id = [int(i) for i in input().split()] # we use 'side' witch is 15
+
+island, already = [],[]
+for y in range(height):
+    line = input()
+    for x in range(width) :
+        if line[x] == 'x' : island.append((x,y)) # x -> island else .
+r = (0,0)
+if (7,7) not in island : r = (7,7)
+elif (4,5) not in island : r = (4,5)
+elif (9,5) not in island : r = (9,5)
+elif (9,9) not in island : r = (9,9)
+elif (5,9) not in island : r = (5,9)
+else : r = (2,7)
+print(*r) 
+
+# game loop
+while True:
+    x, y, my_life, his_life, torpedo, sonar, silence, mc = [int(i) for i in input().split()]
+    sonar_result = input()
+    his_order = input().replace('|', ' ').split()
+    already.append((x,y))
+    decision, max_, isit = d_isit(his_order, max_, island)
+    if decision != 'wait' : z, result = hunt(x, y, isit, already, torpedo)
+    else : z, result = wait(x, y, silence, island, already)
+    if z == 'x' : already = []
+    print(result)
+        # f'| MSG {isit}'
