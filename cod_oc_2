@@ -11,8 +11,13 @@ def sector (x,y) :
         if sector[i][0] <= x <= sector[i][1] and sector[i][2] <= y < sector[i][3] : return i
     return 'x'
 
-def move (direction) :
-    step = { 'N' : (-1,0), 'S' : (1,0), 'E' : (0,1), 'O' : (0,-1),}
+def move (direction,laps) :
+    l_ = laps + 1
+    step = { 'N' : [(-1,0,l_)], 
+             'S' : [(1,0,l_)], 
+             'E' : [(0,1,l_)], 
+             'O' : [(0,-1,l_)], 
+            'Silence' : [(-3,0,l_),(-2,0,l_),(-1,0,l_),(0,-3,l_),(0,-2,l_),(0,-1,l_)]}
     return step[direction]
 
 # parameters
@@ -20,7 +25,6 @@ def move (direction) :
 max_path = 5
 side = 15
 
-""""""""""""""""
 # Function to brows paths, endures silences
 # ne fonctionnne qu'avec un seul silence
 path = [[(1,1)],[(1,2)],[(1,3)],[(1,4),(2,4),(3,4)],[(-1,5)],[(-1,6)],[(-1,7)]]
@@ -39,7 +43,6 @@ while True :
             if j == len(path[i]) : loop = 'x'
     i = path[i][0][1]
 
-"""""""""""""""""
 
 # map 
 
@@ -50,6 +53,8 @@ for y in range(height):
     line = input()
     for x in range(width) :
         if line[x] == 'x' : island.append((x,y)) # x -> island else .
+
+# Firt lap
 r = (0,0)
 if (7,7) not in island : r = (7,7)
 elif (4,5) not in island : r = (4,5)
@@ -71,3 +76,27 @@ while True:
     if z == 'x' : already = []
     print(result)
         # f'| MSG {isit}'
+
+"""
+# entrée
+path = []
+direction = ['N','N','N','O','O','Silence','S','S']
+for i in range(len(direction)) :
+    path.append(move(direction[i],i))
+
+def run_path(path):
+# list of list of tuples : [(x,y,laps)],[()],[(),(),()],[()]
+    i,j = 0,0
+    loop = 'o'
+    while True :
+        if i == len(path) :
+            if loop == 'o': i = 0
+            else : break 
+        if len(path[i]) == 1 : print(path[i][0][0:2])
+        else :
+                print(path[i][j][0:2])
+                j += 1
+                if j == len(path[i]) : loop = 'x'
+        i = path[i][0][2]
+print(run_path(path))
+"""
