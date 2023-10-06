@@ -1,0 +1,43 @@
+#def
+def move (direction,laps) :
+    l_ = laps + 1
+    step = { 'N' : [(-1,0,l_)], 
+             'S' : [(1,0,l_)], 
+             'E' : [(0,1,l_)], 
+             'O' : [(0,-1,l_)], 
+            'Silence' : [(-3,0,l_),(-2,0,l_),(-1,0,l_),(0,-3,l_),(0,-2,l_),(0,-1,l_)]}
+    return step[direction]
+        
+# entrée
+path = []
+direction = ['N','N','N','O','O','Silence','S','S']
+island = [(5,5),(4,8),(0,-2)]
+for i in range(len(direction)) :
+    path.append(move(direction[i],i))
+
+def run_path(path,island):
+# list of list of tuples : [(x,y,laps)],[()],[(),(),()],[()]
+    possible_path = 0
+    i,j = 0,0
+    loop = 'x'
+    while True :
+        if i == len(path) : # 3 en bout de path
+            possible_path += 1
+            if loop == 'o':
+                i = 0
+            else : 
+                return possible_path
+        if  len(path[i]) == 1 and path[i][0] in island : # 1 sur un island sans embranchement
+            return possible_path
+        if len(path[i]) != 1 : # 2 a un enbranchement
+            if j == len(path[i]) : 
+                loop = 'x'
+                if path[i][j][0:2] in island :
+                    return possible_path 
+            else :
+                loop = 'o'
+                if path[i][j][0:2] in island :
+                    i = 0
+                    j += 1
+        i = path[i][0][2]
+print(run_path(path,island))
