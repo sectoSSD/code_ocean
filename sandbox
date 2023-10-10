@@ -16,7 +16,6 @@ island = [(0,-3),(0,2),(0,-2)]
 for i in range(len(direction)) :
     path.append(move(direction[i],i))
 
-print(path)
 
 def run_path(path,island): # nb : un seul 'sielence' possible
 # list of list of tuples : [(x,y,laps)],[()],[(),(),()],[()]
@@ -43,4 +42,15 @@ def run_path(path,island): # nb : un seul 'sielence' possible
                 if path[i][j][0:2] in island :
                     i = 0
         i = path[i][0][2]
-print(run_path(path,island))
+
+my_position = (10,10)
+        
+def possiblepath(my_position, path):
+    possiblepath = []
+    for i in range(len(path)) :
+        possiblepath.append([])
+        for j in range(len(path[i])) :
+            possiblepath[i] += (path[i][j][0] + my_position[0], path[i][j][1] + my_position[1], path[i][j][2]),
+    return possiblepath
+
+# pour l'heure my_position n'a qu'une position. Il faut que la fonction possiblepath teste toute les positions de la map
