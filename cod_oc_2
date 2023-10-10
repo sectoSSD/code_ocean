@@ -1,8 +1,9 @@
 # parameters
 
-max_path = 5
+max_path = 5 # ??
 side = 15
-
+his_path = []
+his_silence_count, his_laps = 0,0
 # main variables 
 """
 my_command : list with all(?) my previous command
@@ -25,6 +26,16 @@ def sector (x,y) :
         if sector[i][0] <= x <= sector[i][1] and sector[i][2] <= y < sector[i][3] : return i
     return 'x'
 
+def direction(order) :
+    r = ''
+    if 'MOVE' in order :
+        if 'N' in order : r = 'N'
+        if 'S' in order : r = 'S'
+        if 'E' in order : r = 'E'
+        if 'O' in order : r = 'O'
+        if 'SILENCE' in order : r = 'Silence'
+    return r
+
 def move (direction,laps) :
     l_ = laps + 1
     step = { 'N' : [(-1,0,l_)], 
@@ -38,21 +49,21 @@ def move (direction,laps) :
 
 # Function to brows paths, endures one silence
 
-def run_path(path,island): 
+def run_path(path,island,side): 
 # list of list of tuples : [(x,y,laps)],[()],[(),(),()],[()]
     possible_path = 0
     i,j = 0,0
     loop = 'x'
     while True :
-        if i == len(path) : # 3 en bout de path
+        if i == len(path) : # en bout de path
             possible_path += 1
             if loop == 'o':
                 i = 0
             else : 
                 return possible_path
-        if  len(path[i]) == 1 and path[i][0][0:2] in island : # 1 sur un island sans embranchement
+        if  len(path[i]) == 1 and path[i][0][0:2] in island or not 0 <= path[i][0][0] <= side or not 0 <= path[i][0][1] <= side : # sur un island sans embranchement ou hors-jeu
             return possible_path
-        if len(path[i]) != 1 : # 2 a un enbranchement
+        if len(path[i]) != 1 : # a un enbranchement
             if j == len(path[i]) - 1 : 
                 loop = 'x'
                 if path[i][j][0:2] in island :
@@ -88,7 +99,22 @@ print(*r)
 while True:
     x, y, my_life, his_life, torpedo, sonar, silence, mc = [int(i) for i in input().split()]
     sonar_result = input()
-    his_order = input().replace('|', ' ').split()
+
+    # his path 
+    his_order = input().replace('|', ' ').split() # his_order = ['move','N','Torpedo]
+    his_path.append(move(direction(his_order),his_laps))
+    his_laps += 1 # laps start from 0
+
+    if 'SILENCE' in his_order :
+        his_silence_count += 1
+        if his_silence_count > 1 : # if there is two silence we restat from 0, no path for this turn
+            his_path = []
+            his_laps = 0
+            his_silence_count = 0            
+
+    if his_path != [] :
+        
+
     already.append((x,y))
     decision, max_, isit = d_isit(his_order, max_, island)
     if decision != 'wait' : z, result = hunt(x, y, isit, already, torpedo)
