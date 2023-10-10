@@ -30,7 +30,7 @@ def run_path(path,island): # nb : un seul 'sielence' possible
                 i = 0
             else : 
                 return possible_path
-        if  len(path[i]) == 1 and path[i][0][0:2] in island : # 1 sur un island sans embranchement
+        if  len(path[i]) == 1 and path[i][0][0:2] in island or not 0 <= path[i][0][0] <= side or not 0 <= path[i][0][1] <= side : # sur un island sans embranchement ou hors-jeu
             return possible_path
         if len(path[i]) != 1 : # 2 a un enbranchement
             if j == len(path[i]) - 1 : 
