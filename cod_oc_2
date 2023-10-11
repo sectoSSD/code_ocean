@@ -1,3 +1,5 @@
+global map_, possible_path
+
 # parameters
 
 max_path = 5 # ??
@@ -38,10 +40,10 @@ def direction(order) :
 
 def move (direction,laps) :
     l_ = laps + 1
-    step = { 'N' : [(-1,0,l_)], 
-             'S' : [(1,0,l_)], 
-             'E' : [(0,1,l_)], 
-             'O' : [(0,-1,l_)], 
+    step = { 'N' : [(0,-1,l_)], 
+             'S' : [(0,1,l_)], 
+             'E' : [(1,-1,l_)], 
+             'O' : [(-1,0,l_)], 
             'Silence' : [(-3,0,l_),(-2,0,l_),(-1,0,l_),(0,-3,l_),(0,-2,l_),(0,-1,l_),
                          (3,0,l_),(2,0,l_),(1,0,l_),(0,3,l_),(0,2,l_),(0,1,l_)]}
     return step[direction]
@@ -49,21 +51,38 @@ def move (direction,laps) :
 
 # Function to brows paths, endures one silence
 
-def run_path(path,island,side): 
+def run_map(brows_map,path,island) : # brows_map designe une list de tuple sans les tuples des islands
+    map_ = {}
+    for xy in brows_map :
+        map_[xy] = run_path(possible_path(xy,path),island)
+    return map_   
+
+def possible_path(position, path): # le path par rapport à une position de référence
+    possible_path = []
+    for i in range(len(path)) :
+        possible_path.append([])
+        for j in range(len(path[i])) :
+            possible_path[i] += (path[i][j][0] + position[0], path[i][j][1] + position[1], path[i][j][2]), # pas juste : les valeurs se cumulent !!!
+    return possible_path
+
+# pour l'heure my_position n'a qu'une position. Il faut que la fonction possiblepath teste toute les positions de la map
+
+def run_path(path,island): # nb : un seul 'sielence' possible
 # list of list of tuples : [(x,y,laps)],[()],[(),(),()],[()]
     possible_path = 0
     i,j = 0,0
     loop = 'x'
     while True :
-        if i == len(path) : # en bout de path
+        if i == len(path) : # 3 en bout de path
             possible_path += 1
             if loop == 'o':
                 i = 0
             else : 
                 return possible_path
-        if  len(path[i]) == 1 and path[i][0][0:2] in island or not 0 <= path[i][0][0] <= side or not 0 <= path[i][0][1] <= side : # sur un island sans embranchement ou hors-jeu
-            return possible_path
-        if len(path[i]) != 1 : # a un enbranchement
+        if len(path[i]) == 1 :
+            if path[i][0][0:2] in island or not 0 <= path[i][0][0] < side or not 0 <= path[i][0][1] < side : # sur un island sans embranchement ou hors-jeu
+                return possible_path
+        if len(path[i]) != 1 : # 2 a un enbranchement
             if j == len(path[i]) - 1 : 
                 loop = 'x'
                 if path[i][j][0:2] in island :
@@ -73,17 +92,18 @@ def run_path(path,island,side):
                 loop = 'o'
                 if path[i][j][0:2] in island :
                     i = 0
-        i = path[i][0][2]
+        i = path[i][0][2]     
 
 # map 
 
 width, height, my_id = [int(i) for i in input().split()] # we use 'side' witch is 15
 
-island, already = [],[]
+brows_map, island, already = [],[],[]
 for y in range(side):
     line = input()
     for x in range(side) :
         if line[x] == 'x' : island.append((x,y)) # x -> island else .
+        else : brows_map.append((x,y))
 
 # Firt lap
 r = (0,0)
@@ -97,24 +117,30 @@ print(*r)
 
 # game loop
 while True:
-    x, y, my_life, his_life, torpedo, sonar, silence, mc = [int(i) for i in input().split()]
-    sonar_result = input()
+    x, y, my_life, his_life, torpedo, sonar, silence, mc = [int(i) for i in input().split()]  ####
+    sonar_result = input() ####
 
     # his path 
-    his_order = input().replace('|', ' ').split() # his_order = ['move','N','Torpedo]
-    his_path.append(move(direction(his_order),his_laps))
-    his_laps += 1 # laps start from 0
+    his_order = input().replace('|', ' ').split() # his_order = ['move','N','Torpedo] ####
+    
+    if 'MOVE' in his_order :
+        his_path.append(move(direction(his_order),his_laps))
+        his_laps += 1 # laps start from 0
 
-    if 'SILENCE' in his_order :
-        his_silence_count += 1
-        if his_silence_count > 1 : # if there is two silence we restat from 0, no path for this turn
-            his_path = []
-            his_laps = 0
-            his_silence_count = 0            
+    else : 
+        if 'SILENCE' in his_order :
+            his_silence_count += 1
+            if his_silence_count > 1 : # if there is two silence we restat from 0, no path for this turn
+                his_path = []
+                his_laps = 0
+                his_silence_count = 0            
 
-    if his_path != [] :
-        
+    if his_path :
+        map_ = run_map(brows_map,his_path,island)
+        print(f'MOVE N SILENCE | MSG {map_}')
+    else : print('MOVE N SILENCE')
 
+"""
     already.append((x,y))
     decision, max_, isit = d_isit(his_order, max_, island)
     if decision != 'wait' : z, result = hunt(x, y, isit, already, torpedo)
@@ -122,3 +148,5 @@ while True:
     if z == 'x' : already = []
     print(result)
         # f'| MSG {isit}'
+
+"""
