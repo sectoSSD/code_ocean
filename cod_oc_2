@@ -106,6 +106,7 @@ for y in range(side):
         else : brows_map.append((x,y))
 
 # Firt lap
+# 7-abs(7-x)+7-abs(7-y) ==> pour valoriser le milieu
 r = (0,0)
 if (7,7) not in island : r = (7,7)
 elif (4,5) not in island : r = (4,5)
