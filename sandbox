@@ -1,73 +1,9 @@
-global map_, possible_path
-    
-#def
-def move (direction,laps) :
-    l_ = laps + 1
-    step = { 'N' : [(-1,0,l_)], 
-             'S' : [(1,0,l_)], 
-             'E' : [(0,1,l_)], 
-             'O' : [(0,-1,l_)], 
-            'Silence' : [(-3,0,l_),(-2,0,l_),(-1,0,l_),(0,-3,l_),(0,-2,l_),(0,-1,l_),
-                         (3,0,l_),(2,0,l_),(1,0,l_),(0,3,l_),(0,2,l_),(0,1,l_)]}
-    return step[direction]
-    
-def run_map(brows_map,path,island) : # brows_map designe une list de tuple sans les tuples des islands
-    map_ = {}
-    for xy in brows_map :
-        map_[xy] = run_path(possible_path(xy,path),island)
-    return map_   
+dir_ = 'NSEO'
+list_ = []
+for i in range(0,16) :
+    list_.append([dir_ for j in range(4**i)])
 
-def possible_path(position, path): # le path par rapport à une position de référence
-    possible_path = []
-    for i in range(len(path)) :
-        possible_path.append([])
-        for j in range(len(path[i])) :
-            possible_path[i] += (path[i][j][0] + position[0], path[i][j][1] + position[1], path[i][j][2]),
-    return possible_path
-
-# pour l'heure my_position n'a qu'une position. Il faut que la fonction possiblepath teste toute les positions de la map
-
-def run_path(path,island): # nb : un seul 'sielence' possible
-# list of list of tuples : [(x,y,laps)],[()],[(),(),()],[()]
-    possible_path = 0
-    i,j = 0,0
-    loop = 'x'
-    while True :
-        if i == len(path) : # 3 en bout de path
-            possible_path += 1
-            if loop == 'o':
-                i = 0
-            else : 
-                return possible_path
-        if  len(path[i]) == 1 and path[i][0][0:2] in island or not 0 <= path[i][0][0] <= side or not 0 <= path[i][0][1] <= side : # sur un island sans embranchement ou hors-jeu
-            return possible_path
-        if len(path[i]) != 1 : # 2 a un enbranchement
-            if j == len(path[i]) - 1 : 
-                loop = 'x'
-                if path[i][j][0:2] in island :
-                    return possible_path 
-            else :
-                j += 1
-                loop = 'o'
-                if path[i][j][0:2] in island :
-                    i = 0
-        i = path[i][0][2]       
-# entrée
-
-side = 15
-
-island = [(0,-3),(0,2),(0,-2)]
-
-direction = ['N','N','N','O','O','Silence','S','S']
-
-path = []
-for i in range(len(direction)) :
-    path.append(move(direction[i],i))
-
-map_ = []
-for x in side :
-    for y in side :
-        map_.append((x,y))
+print(list_)
 
 map_ = run_map()
 print(map_)
