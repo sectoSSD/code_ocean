@@ -1,14 +1,69 @@
-dir_ = 'NSEO'
-list_ = []
-for i in range(0,16) :
-    list_.append([dir_ for j in range(4**i)])
-
-print(list_)
-
-map_ = run_map()
-print(map_)
+### paramètre de test
+island = [(2,2),(2,3),(3,2),(3,3)]
 
 
+for x in range(15) :
+    for y in range(15) :
+        if in_island(x,y,island) : brows_map.append((x,y))
+ ### fin
+ 
+ ### fonction existante
+
+def add (tuple_1, tuple_2,args='') :
+    if args : return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1], args
+    else : return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
+
+def middle(x,y) :
+    return 7-abs(7-x)+7-abs(7-y)
+
+
+def in_island(x,y,island) :
+    return (not (x,y) in island)
+
+for x in range(15) :
+    for y in range(15) :
+        print(in_island(x,y,island))
+
+def firs_lap(side):
+    laps_to_charge_weapons = 16
+    
+    for xy in tile :
+        while
+        for laps in range(laps_to_charge_weapons):
+
+### New
+
+def best_value(x,x_list) ### gerer la fonction pour pouvoir avoir la fonction middle mais aussi une autre
+
+def one_step(xy,island) : 
+    # retourn une list de tuple contenant des cases sans island
+    new_step = (1,0),(-1,0),(0,1),(0,-1)
+    new_tile = list(map(lambda x : add(xy,x),new_step))
+    for tile in new_tile :
+        if tile in island :
+            new_tile.remove(tile)
+    return new_tile
+            
+def best_start(brows_map,island) :
+    temp_value = 0
+    temp_xy = (7,7)
+    while brows_map :
+        for x,y in brows_map :
+            cursor = middle(x,y)
+            if cursor > temp_value :
+                temp_value = cursor
+                temp_xy = x,y
+        # on a selectionner une case de départ à partir duquel on crée un parcours
+        temp_start = temp_xy.copy()
+        current_tile = temp_xy.copy()
+        temp_path = []
+        while len(temp_path) != 16 :
+            possible_next_steps = one_step(temp_start,island)
+            for next_xy in possible_next_steps :
+                temp_value = 0
+                cursor = middle(xy)
+                if cursor > temp_value : ### on fait deux fois la même choses :  cf best_value     
+    
 # 1 Parcours de la map à partir de (7,7) de manière concentrique
 #   a) Si ma case n'est pas dans island, je selection
 #   b) Sinon je prend la case suivant
