@@ -1,15 +1,6 @@
 
 ### On essaye avec les classes
 
-### paramÃ¨tre de test
-island = [(2,2),(2,3),(3,2),(3,3)]
-
-
-for x in range(15) :
-    for y in range(15) :
-        if in_island(x,y,island) : brows_map.append((x,y))
- ### fin
- 
  ### fonction existante
 
 def add (tuple_1, tuple_2,args='') :
@@ -23,18 +14,7 @@ def middle(x,y) :
 def in_island(x,y,island) :
     return (not (x,y) in island)
 
-for x in range(15) :
-    for y in range(15) :
-        print(in_island(x,y,island))
-
-def firs_lap(side):
-    laps_to_charge_weapons = 16
-    
-    for xy in tile :
-        while
-        for laps in range(laps_to_charge_weapons):
-
-### New I
+### New
 
 def best_value(xy_list, function) :
     # ne fonction qu'avec une liste de tuples [(x,y),...]
@@ -60,6 +40,15 @@ def step(current_tile, next_tile) :
     return next_tile[0] - current_tile[0], next_tile[1] - current_tile[1]
           
 
+### parametre de test
+
+island = [(2,2),(2,3),(3,2),(3,3)]
+brows_map = []
+
+for x in range(15) :
+    for y in range(15) :
+        if in_island(x,y,island) : brows_map.append((x,y))
+
 class best_start():
     
     brows_map = []
@@ -71,8 +60,7 @@ class best_start():
     bad_brows = []
     current_path = [] #=> temp_path
     
-    def __init__(self,brows_map,island): # faut tous les mettre ?
-        
+    def __init__(self,brows_map,island,current_map,map_cursor,brows_cursor,current_brows,bad_brows,current_path): # faut tous les mettre ?
         self.brows_map = brows_map
         self.island = island
         self.current_map = current_map
@@ -82,11 +70,8 @@ class best_start():
         self.bad_brows = bad_brows
         self.current_path = current_path
     
-    def I_map(current_map) :
-
-        while current_map :
-            map_cursor = best_value(current_map, middle)
-            # bad_brows,current_path deja definit
+    def III_dilution():
+        return x
             
     def II_brows(map_cursor):
         
@@ -113,10 +98,18 @@ class best_start():
                     bad_brows.append(current_brows)
                     current_brows = [map_cursor]
                 
-        else : III_dilution(current_path)
-    
-    def III_dilution
+        else : print(current_path)#return tIII_dilution(current_path)
+        
+    def I_map(current_map) :
 
+        while current_map :
+            map_cursor = best_value(current_map, middle)
+            return II_brows(map_cursor)
+            # bad_brows,current_path deja definit
+
+# test :
+    
+best_start.I_map(brows_map)
 
 # on en est Ã  2 b il faudra faire des tests
         
