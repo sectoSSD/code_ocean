@@ -13,7 +13,8 @@ def add (tuple_1, tuple_2,args='') :
 
 def middle(xy) :
     x,y = xy
-    return 7-abs(7-x)+7-abs(7-y)
+    if abs(7-x) >= abs(7-y) : return 14-abs(7-x)
+    else : return 14-abs(7-y)
 
 
 def in_island(x,y,island) :
@@ -35,10 +36,12 @@ def best_value(xy_list, function) :
 def one_step(xy, island,current_brows,brows_map) : 
     # retourn une list de tuple contenant des cases sans island
     new_step = (1,0),(-1,0),(0,1),(0,-1)
-    new_tile = list(map(lambda x : add(xy,x), new_step))
-    for tile in new_tile :
+    new_tile = []
+    possible_new_tile = list(map(lambda x : add(xy,x), new_step))
+    for tile in possible_new_tile :
         if tile in island or tile in current_brows or tile not in brows_map :
-            new_tile.remove(tile)
+            pass
+        else : new_tile.append(tile)
     return new_tile
 
 def step(current_tile, next_tile) :
