@@ -13,9 +13,7 @@ def add (tuple_1, tuple_2,args='') :
 
 def middle(xy) :
     x,y = xy
-    if abs(7-x) >= abs(7-y) : return 14-abs(7-x)
-    else : return 14-abs(7-y)
-
+    return 7-abs(7-x) + 7-abs(7-y) + min(7-abs(7-x), 7-abs(7-y)) # Manhattan + Euclidienne
 
 def in_island(x,y,island) :
     return (not (x,y) in island)
@@ -55,7 +53,7 @@ def I_map(current_map) :
         return map_cursor
         # bad_brows,current_path deja definit
   
-def II_brows(map_cursor,brows_map,island) :
+def II_brows(map_cursor,brows_map, island,current_map) :
     
     current_path = [] #=> temp_path
     bad_brows = []
@@ -82,11 +80,15 @@ def II_brows(map_cursor,brows_map,island) :
         else :
             print('while possible_next_tiles ... ELSE')
             if brows_cursor == map_cursor :
-                current_map.remove(map_cursor)
+                print(f'current_map BEFOR bad tile to brows path : {current_map}')
+                current_map.remove((7,7))#current_map.remove(map_cursor)
+                print(f'current_map AFTER bad tile to brows path : {current_map}')
                 I_map(current_map)
             else :
                 bad_brows.append(current_brows)
-                current_brows = [map_cursor]    
+                print(f'bad brows : {bad_brows}')
+                current_brows = [map_cursor]  
+                brows_cursor = map_cursor
     else : 
         print(f'end of II_brows : {current_path}')
         return current_path
@@ -100,7 +102,7 @@ def main():
     
     brows_map = [] # map de référence sans les îles
     island = []
-    island = [(2,2),(2,3),(3,2),(3,3)]
+    island = [(6,7),(7,6),(8,7),(7,8)]
     for x in range(15) :
         for y in range(15) :
             if in_island(x,y,island) : brows_map.append((x,y))
@@ -108,14 +110,12 @@ def main():
     current_map = brows_map.copy() # ???
             
     I = I_map(current_map)
-    II = II_brows(I, brows_map, island)
+    II = II_brows(I, brows_map, island,current_map)
     return II
 
 if __name__ == '__main__' : main()
 
-    
-# on en est Ã  2 b il faudra faire des tests
-        
+
     
 # 1 Parcours de la map a  partir de (7,7) de manière concentrique
 #   a) Si ma case n'est pas dans island, je selection
