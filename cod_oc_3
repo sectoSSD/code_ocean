@@ -45,15 +45,15 @@ def one_step(xy, island,current_brows,brows_map) :
 def step(current_tile, next_tile) :
     return next_tile[0] - current_tile[0], next_tile[1] - current_tile[1]
  
-def I_map(current_map) :
+def I_map(current_map, brows_map, island) :
 
     while current_map :
         map_cursor = best_value(current_map, middle)
         print(f'map_cursor in I_map : {map_cursor}')
-        return map_cursor
+        return II_brows(current_map, brows_map, island, map_cursor)
         # bad_brows,current_path deja definit
   
-def II_brows(map_cursor,brows_map, island,current_map) :
+def II_brows(current_map, brows_map, island, map_cursor) :
     
     current_path = [] #=> temp_path
     bad_brows = []
@@ -81,9 +81,9 @@ def II_brows(map_cursor,brows_map, island,current_map) :
             print('while possible_next_tiles ... ELSE')
             if brows_cursor == map_cursor :
                 print(f'current_map BEFOR bad tile to brows path : {current_map}')
-                current_map.remove((7,7))#current_map.remove(map_cursor)
+                current_map.remove(map_cursor)
                 print(f'current_map AFTER bad tile to brows path : {current_map}')
-                I_map(current_map)
+                return I_map(current_map, brows_map, island)
             else :
                 bad_brows.append(current_brows)
                 print(f'bad brows : {bad_brows}')
@@ -108,10 +108,7 @@ def main():
             if in_island(x,y,island) : brows_map.append((x,y))
             
     current_map = brows_map.copy() # ???
-            
-    I = I_map(current_map)
-    II = II_brows(I, brows_map, island,current_map)
-    return II
+    return I_map(current_map, brows_map, island)
 
 if __name__ == '__main__' : main()
 
