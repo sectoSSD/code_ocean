@@ -29,7 +29,8 @@ def map_(width, height):
 
 # tools
 
-
+def iter_path(path) : 
+    for step in path : yield step
 
 def add (tuple_1, tuple_2,args='') :
     if args : return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1], args
@@ -52,7 +53,7 @@ def sector (x,y) :
         if sector[i][0] <= x <= sector[i][1] and sector[i][2] <= y < sector[i][3] : return i
     return 'x'
 
-# utility
+# LEVEL 3
 
 def direction(order) :
     r = ''
@@ -118,7 +119,7 @@ def test_path(path, brows_map) :
         else : possible_tile += 1
     return possible_tile    
 
-# play
+# LEVEL 2
 
 def start_I_map(current_map, brows_map) :
 
@@ -157,31 +158,27 @@ def start_II_brows(current_map, brows_map, map_cursor) :
     else : 
         return start_III_dilution(current_map, map_cursor, current_path, brows_map, dilution_rate)
 
-
 def start_III_dilution(current_map, map_cursor, current_path, brows_map, dilution_rate): # add : 
     if test_path(current_path,brows_map) / len(brows_map) > dilution_rate :
         return map_cursor, current_path
     else : 
         current_map.remove(map_cursor)
-        return start_I_map(current_map, brows_map)
+        return start_I_map(current_map, brows_map)    
 
-def iter_path(path) : # ET LA
-    for step in path :
-        yield path
+# LEVEL 1
 
-def first_rounds(path) : #LA
-    step = iter_path(path)
-    try : print(f'MOVE {dir_path_conv(next(step))}')
-    except StopIteration : print('MOVE N')
-    return
+def start(brows_map):          
+    current_map = brows_map.copy() # ???
+    return start_I_map(current_map, brows_map) # <===== First LAP
 
 def game_loop(brows_map,path) : # ICI
-    
+    first_steps = iter_path(path)
     while True:
-        first_rounds(path)
         x, y, my_life, his_life, torpedo, sonar, silence, mc = [int(i) for i in input().split()]  ####
         sonar_result = input() ####
         his_order = input().replace('|', ' ').split() # his_order = ['move','N','Torpedo] ####
+        
+        print(f'MOVE {dir_path_conv(next(first_steps))}')
 
 """
 def run_map(brows_map,path,island) : # brows_map designe une list de tuple sans les tuples des islands
@@ -189,9 +186,7 @@ def run_map(brows_map,path,island) : # brows_map designe une list de tuple sans 
     for xy in brows_map :
         map_[xy] = run_path(possible_path(xy,path),island)
     return map_   
-"""
 
-"""
 def run_path(path,island): # nb : un seul 'sielence' possible
 # list of list of tuples : [(x,y,laps)],[()],[(),(),()],[()]
     possible_path = 0
@@ -222,10 +217,6 @@ def run_path(path,island): # nb : un seul 'sielence' possible
 
 # Start :
 
-def start(brows_map):          
-    current_map = brows_map.copy() # ???
-    return start_I_map(current_map, brows_map) # <===== First LAP
-
 if __name__ == '__main__' : 
     width, height, my_id = side()
     brows_map, island = map_(width, height)
@@ -250,7 +241,6 @@ if __name__ == '__main__' :
         map_ = run_map(brows_map,his_path,island)
         print(f'MOVE N SILENCE | MSG {map_}')
     else : print('MOVE N SILENCE')
-
 
     already.append((x,y))
     decision, max_, isit = d_isit(his_order, max_, island)
