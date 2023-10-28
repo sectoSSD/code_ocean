@@ -24,45 +24,46 @@ def run_map(brows_map,path) : # brows_map designe une list de tuple sans les tup
 def run_path(xy, brows_map, path): # nb : un seul 'sielence' possible
 # list of list of tuples : [(x,y,laps,sector)],[()],[(),(),()],[()]
     possible_path = 0
-    
-    i,j = 0,0
+    i, j= 0, 0
     loop = 'x'
+    
     while True :
-        if i == len(path) : # en bout de path
-            print('en bout de path')
-            possible_path += 1
-            if loop == 'o':
-                print('nouveau path')
-                i = 0
-            else : 
-                return possible_path
-        if len(path[i]) == 1 and add(path[i][0], xy) not in brows_map: # sur un island sans embranchement ou hors-jeu
+        if len(path[i]) == 1 : # sans embranchement
+            if add(path[i][0], xy) not in brows_map: # Obstacle
                 print('sur un island sans embranchement ou hors-jeu')
                 return possible_path
-        if len(path[i]) != 1 : # a un enbranchement
-            print('a un enbranchement')
-            if j == len(path[i]) - 1 : # en dernière branche
-                print('en dernière branche')
-                if all(len(k) == 1 for k in path[i:]) : # en dernière embranchement
-                    print('en dernière embranchement')
-                    loop = 'x'
-                    if add(path[i][j], xy) not in brows_map :
-                        print('obstacle')
-                        return possible_path
-                else : 
-                    print('encore un embranchement')
-                    j = 0
-            else :
-                print('nouvelle branche')
-                if add(path[i][j], xy) not in brows_map :
+            elif i == len(path) - 1 : # Au bout
+                print('en bout de path')
+                possible_path += 1
+                if loop == 'o':
+                    print('nouveau path')
                     i = 0
-                else :
+                else : 
+                    return possible_path
+        else : # a un enbranchement
+            if all(len(k) == 1 for k in path[i:]) : # en dernière embranchement ET SI Y A RIEN DERRIERE, PAUFINER !!
+            
+                if add(path[i][j], xy) not in brows_map : #'obstacle'
+                    print('obstacle en dernière branche')
+                    path[i].pop(j)
+                    i = 0
+                    loop = 'o'
+                elif  j == len(path[i]) - 1 : # au bout
+                    print('branche finit')
+                    for i in path :
+                        if len(i) > 1 : path[i].pop(0)
+                    i, j = 0, 0
+                    loop = 'o'
+                else : # nouvelle brache
+                    print('nouvelle dernière branche')
                     j += 1
                     loop = 'o'
+            else : # il y a des branche derrière
+                if add(path[i][0], xy) not in brows_map :
+                    print('obstacle a un enbranchement')
+                    path[i].pop(0)
         print(f'on avance {path[i][0][2]}')
         i = path[i][0][2]
-
-
 
 def main():
     
