@@ -1,11 +1,30 @@
+"""
+    my_command : list with all(?) my previous command
+    my_order : list of list of tuples with all my move as perceived by my enemy
+    already  : all the tiles where i have allready been
+    his_order : list of list of tuples with all his possible move : 
+                can suppot only one silence without beeing deleted
+"""
+
 # parameters
 
 max_path = 5 # ??
-his_path = []
 his_silence_count, his_laps = 0,0
 dilution_rate = 81//225
 
-# map 
+# input
+
+"""
+At the beginning :
+input 1 -> width, height, my_id -> 
+input 1 -> brows_map, island
+
+At each round :
+input 1 -> x, y, my_life, his_life, torpedo, sonar, silence, mc
+input 2 -> sonar_result
+input 3 -> his_order
+"""
+
 def side() :
     width, height, my_id = [int(i) for i in input().split()] # we use 'side' witch is 15
     return width, height, my_id
@@ -18,19 +37,30 @@ def map_(width, height):
             if line[x] == 'x' : island.append((x,y)) # x -> island else .
             else : brows_map.append((x,y))
     return brows_map, island
+# input 1
+# input 2
+def his_order():
+    
+    his_order = input().replace('|', ' ').split() # his_order = ['move','N','Torpedo]
+    his_path = []
 
-"""
-    my_command : list with all(?) my previous command
-    my_order : list of list of tuples with all my move as perceived by my enemy
-    already  : all the tiles where i have allready been
-    his_order : list of list of tuples with all his possible move : 
-                can suppot only one silence without beeing deleted
-"""
-
+    if 'MOVE' in his_order :
+        his_path.append(move(direction(his_order),his_laps))
+        his_laps += 1 # laps start from 0
+    else : 
+        if 'SILENCE' in his_order :
+            his_silence_count += 1
+            if his_silence_count > 1 : # if there is two silence we restat from 0, no path for this turn
+                his_path = []
+                his_laps = 0
+                his_silence_count = 0         
 # tools
 
 def iter_path(path) : 
     for step in path : yield step
+
+def iter_laps():
+    for laps in range(1,302): yield laps
 
 def add (tuple_1, tuple_2,args='') :
     if args : return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1], args
@@ -53,9 +83,9 @@ def sector (x,y) :
         if sector[i][0] <= x <= sector[i][1] and sector[i][2] <= y < sector[i][3] : return i
     return 'x'
 
-# LEVEL 3
+# Converter
 
-def direction(order) :
+def move (order) : # direction ==> move 
     r = ''
     if 'MOVE' in order :
         if 'N' in order : r = 'N'
@@ -63,6 +93,8 @@ def direction(order) :
         if 'E' in order : r = 'E'
         if 'W' in order : r = 'W'
         if 'SILENCE' in order : r = 'Silence'
+    if 'SURFACE' in order or 'SONAR' in order :
+        for i in '123456789' : if i in order : r 
     return r
 
 """
@@ -89,6 +121,8 @@ def dir_path_conv(dir_path) :
             (-1, 0 ) : 'W'
                                 }
     return step[dir_path]
+
+# LEVEL 3
 
 def best_value(xy_list, function) :
     # ne fonction qu'avec une liste de tuples [(x,y),...]
@@ -173,69 +207,16 @@ def start(brows_map):
 
 def game_loop(brows_map,path) : # ICI
     first_steps = iter_path(path)
+    rev_counter = iter_laps()
+    
     while True:
-        x, y, my_life, his_life, torpedo, sonar, silence, mc = [int(i) for i in input().split()]  ####
-        sonar_result = input() ####
-        his_order = input().replace('|', ' ').split() # his_order = ['move','N','Torpedo] ####
+        
+        x, y, my_life, his_life, torpedo, sonar, silence, mc = [int(i) for i in input().split()]
+        sonar_result = input()
+        laps = next(rev_counter)
+        his_order()
         
         print(f'MOVE {dir_path_conv(next(first_steps))}')
-
-"""
-def run_map(brows_map,path,island) : # brows_map designe une list de tuple sans les tuples des islands
-    map_ = {}
-    for xy in brows_map :
-        map_[xy] = run_path(possible_path(xy,path),island)
-    return map_   
-
-def run_path(path,island): # nb : un seul 'sielence' possible
-# list of list of tuples : [(x,y,laps)],[()],[(),(),()],[()]
-    possible_path = 0
-    i,j = 0,0
-    loop = 'x'
-    while True :
-        if i == len(path) : # 3 en bout de path
-            possible_path += 1
-            if loop == 'o':
-                i = 0
-            else : 
-                return possible_path
-        if len(path[i]) == 1 :
-            if path[i][0][0:2] in island or not 0 <= path[i][0][0] < side or not 0 <= path[i][0][1] < side : # sur un island sans embranchement ou hors-jeu
-                return possible_path
-        if len(path[i]) != 1 : # 2 a un enbranchement
-            if j == len(path[i]) - 1 : 
-                loop = 'x'
-                if path[i][j][0:2] in island :
-                    return possible_path 
-            else :
-                j += 1
-                loop = 'o'
-                if path[i][j][0:2] in island :
-                    i = 0
-        i = path[i][0][2]
-"""
-
-# Start :
-
-if __name__ == '__main__' : 
-    width, height, my_id = side()
-    brows_map, island = map_(width, height)
-    start, path = start(brows_map)
-    print(*start,sep=' ')
-    game_loop(brows_map,path)
-
-"""
-    if 'MOVE' in his_order :
-        his_path.append(move(direction(his_order),his_laps))
-        his_laps += 1 # laps start from 0
-
-    else : 
-        if 'SILENCE' in his_order :
-            his_silence_count += 1
-            if his_silence_count > 1 : # if there is two silence we restat from 0, no path for this turn
-                his_path = []
-                his_laps = 0
-                his_silence_count = 0            
 
     if his_path :
         map_ = run_map(brows_map,his_path,island)
@@ -250,4 +231,44 @@ if __name__ == '__main__' :
     print(result)
         # f'| MSG {isit}'
 
-"""
+def run_map(brows_map,path,island) : # brows_map designe une list de tuple sans les tuples des islands
+    map_ = {}
+    for xy in brows_map :
+        map_[xy] = run_path(current_path(xy,path),island)
+    return map_   
+
+def run_path(path,brows_map): # nb : un seul 'sielence' possible
+# list of list of tuples : [(x,y,laps)],[()],[(),(),()],[()]
+    possible_path = 0
+    i,j = 0,0
+    loop = 'x'
+    while True :
+        if i == len(path) : # 3 en bout de path
+            possible_path += 1
+            if loop == 'o':
+                i = 0
+            else : 
+                return possible_path
+        if len(path[i]) == 1 :
+            if path[i][0][0:2] not in brows_map: # sur un island sans embranchement ou hors-jeu
+                return possible_path
+        if len(path[i]) != 1 : # 2 a un enbranchement
+            if j == len(path[i]) - 1 : 
+                loop = 'x'
+                if path[i][j][0:2] not in brows_map :
+                    return possible_path 
+            else :
+                j += 1
+                loop = 'o'
+                if path[i][j][0:2] not in brows_map :
+                    i = 0
+        i = path[i][0][2]
+
+# Play :
+
+if __name__ == '__main__' : 
+    width, height, my_id = side()
+    brows_map, island = map_(width, height)
+    start, path = start(brows_map)
+    print(*start,sep=' ')
+    game_loop(brows_map,path)
