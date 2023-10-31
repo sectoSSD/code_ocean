@@ -1,48 +1,10 @@
-# parameters
 
-max_path = 5 # ??
-his_path = []
-his_silence_count, his_laps = 0,0
-dilution_rate = 49//225
-
-# map 
-
-def side() :
-    width, height, my_id = [int(i) for i in input().split()] # we use 'side' witch is 15
-    return width, height, my_id
-
-def map_(width, height):
-    brows_map, island = [],[]
-    for y in range(height) :
-        line = input()
-        for x in range(width) :
-            if line[x] == 'x' : island.append((x,y)) # x -> island else .
-            else : brows_map.append((x,y))
-    return brows_map, island
-
-"""
-    my_command : list with all(?) my previous command
-    my_order : list of list of tuples with all my move as perceived by my enemy
-    already  : all the tiles where i have allready been
-    his_order : list of list of tuples with all his possible move : 
-                can suppot only one silence without beeing deleted
-"""
-
-# tools
-
-def add (tuple_1, tuple_2,args='') :
-    if args : return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1], args
+def add (tuple_1, tuple_2, laps='',sector='') :
+    if laps : return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1], laps
+    elif sector : return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1], laps, sector
     else : return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
 
-def middle(xy) :
-    x,y = xy
-    return 7-abs(7-x) + 7-abs(7-y) + min(7-abs(7-x), 7-abs(7-y)) # Manhattan + Euclidienne
-
-def step(current_tile, next_tile) :
-    return next_tile[0] - current_tile[0], next_tile[1] - current_tile[1]
- 
-def current_path(xy,path) : # adapter one_step
-    return list(map(lambda x : add(xy,x), path))
+def current_path(xy, path) : return list(map(lambda xy_path : add(xy, xy_path), path))
 
 def sector (x,y) :
     sector = {'1': [0,5,0,5],  '2' : [0,5,5,10],  '3' : [0,5,10,15],
@@ -52,194 +14,164 @@ def sector (x,y) :
         if sector[i][0] <= x <= sector[i][1] and sector[i][2] <= y < sector[i][3] : return i
     return 'x'
 
-# utility
-
-def direction(order) :
-    r = ''
-    if 'MOVE' in order :
-        if 'N' in order : r = 'N'
-        if 'S' in order : r = 'S'
-        if 'E' in order : r = 'E'
-        if 'O' in order : r = 'O'
-        if 'SILENCE' in order : r = 'Silence'
-    return r
-
-def move (direction,laps) :
-    l_ = laps + 1
-    step = { 'N' : [(0,-1,l_)], 
-             'S' : [(0,1,l_)], 
-             'E' : [(1,-1,l_)], 
-             'O' : [(-1,0,l_)], 
-            'Silence' : [(-3,0,l_),(-2,0,l_),(-1,0,l_),(0,-3,l_),(0,-2,l_),(0,-1,l_),
-                         (3,0,l_),(2,0,l_),(1,0,l_),(0,3,l_),(0,2,l_),(0,1,l_)]}
-    return step[direction]
-
-def best_value(xy_list, function) :
-    # ne fonction qu'avec une liste de tuples [(x,y),...]
-    temp_value = 0
-    temp_xy = (0,0)
-    for xy in xy_list :
-        cursor = function(xy)# 
-        if cursor > temp_value :
-            temp_value = cursor
-            temp_xy = xy
-    return temp_xy
-
-def one_step(xy, current_brows, brows_map) : 
-    # retourn une list de tuple contenant des cases sans island
-    new_step = (1,0),(-1,0),(0,1),(0,-1)
-    new_tile = []
-    for tile in current_path(xy,new_step) :
-        if tile in current_brows or tile not in brows_map :
-            pass
-        else : new_tile.append(tile)
-    return new_tile
-      
-def test_path(path, brows_map) :
-    possible_tile = 0
-    for brows_tile in brows_map :
-        for path_tile in current_path(brows_tile,path) :
-            if path_tile not in brows_map : break# (mieux a faire mais bon ...)
-        else : possible_tile += 1
-    return possible_tile    
-
-
-# play
-
-def I_map(current_map, brows_map) :
-
-    while current_map :
-        map_cursor = best_value(current_map, middle)
-        print(f'map_cursor in I_map : {map_cursor}')
-        return II_brows(current_map, brows_map, map_cursor)
-        # bad_brows,current_path deja definit
-  
-def II_brows(current_map, brows_map, map_cursor) :
-    
-    current_path = [] #=> temp_path
-    bad_brows = []
-    brows_cursor = map_cursor
-    current_brows = [map_cursor]
-    
-    while len(current_path) != 16 :
-        print(f'brows_cursor : {brows_cursor}')
-        print(f'current_brows : {current_brows}')
-        possible_next_tiles = one_step(brows_cursor, current_brows, brows_map)
-        
-        while possible_next_tiles :
-            print(f'possible_next_tiles :{ possible_next_tiles}')
-            next_tile = best_value(possible_next_tiles, middle)
-            print(f'next_tile :{ next_tile}')
-            current_brows.append(next_tile)
-            if current_brows in bad_brows :
-                current_brows.pop()
-                possible_next_tiles.remove(next_tile)
-            else :
-                current_path.append(step(brows_cursor, next_tile))
-                brows_cursor = next_tile
-                break
-        else :
-            print(f'obstacle, map_cursor {map_cursor}, brows_cursor {brows_cursor} ')
-            if brows_cursor == map_cursor :
-                current_map.remove(map_cursor)
-                return I_map(current_map, brows_map)
-            else :
-                bad_brows.append(current_brows)
-                print(f'bad brows : {bad_brows}')
-                current_brows = [map_cursor]  
-                brows_cursor = map_cursor
-    else : 
-        print(f'III_dilution with map_cursor : {map_cursor}')
-        return III_dilution(current_map, map_cursor, current_brows, brows_map, dilution_rate)
-
-
-def III_dilution(current_map, map_cursor, path, brows_map, dilution_rate): # add : 
-    if test_path(path,brows_map) / len(brows_map) > dilution_rate :
-        return print(f'map_cursor : {map_cursor}',f'current_path : {path}')
-    else : 
-        current_map.remove(map_cursor)
-        return I_map(current_map, brows_map)
-
-"""
-def run_map(brows_map,path,island) : # brows_map designe une list de tuple sans les tuples des islands
+def run_map(brows_map,path) : # brows_map designe une list de tuple sans les tuples des islands
     map_ = {}
-    for xy in brows_map :
-        map_[xy] = run_path(possible_path(xy,path),island)
+    #for xy in brows_map :
+    xy = (1,1)
+    map_[xy] = run_path(xy, brows_map, path)
     return map_   
-"""
 
-"""
-def run_path(path,island): # nb : un seul 'sielence' possible
-# list of list of tuples : [(x,y,laps)],[()],[(),(),()],[()]
+def run_path(start_tile,  brows_map, path): # nb : un seul 'sielence' possible
+# list of list of tuples : [(x,y,laps,sector)],[()],[(),(),()],[()]
     possible_path = 0
-    i,j = 0,0
-    loop = 'x'
-    while True :
-        if i == len(path) : # 3 en bout de path
-            possible_path += 1
-            if loop == 'o':
-                i = 0
-            else : 
-                return possible_path
-        if len(path[i]) == 1 :
-            if path[i][0][0:2] in island or not 0 <= path[i][0][0] < side or not 0 <= path[i][0][1] < side : # sur un island sans embranchement ou hors-jeu
-                return possible_path
-        if len(path[i]) != 1 : # 2 a un enbranchement
-            if j == len(path[i]) - 1 : 
-                loop = 'x'
-                if path[i][j][0:2] in island :
-                    return possible_path 
-            else :
-                j += 1
-                loop = 'o'
-                if path[i][j][0:2] in island :
-                    i = 0
-        i = path[i][0][2]
-"""
-
-# Firt lap :
-
-def main(brows_map):          
-    current_map = brows_map.copy() # ???
-    return I_map(current_map, brows_map) # <===== First LAP
-
-if __name__ == '__main__' : 
-    width, height, my_id = side()
-    brows_map, island = map_(width, height)
-    main(brows_map)
-
-# game loop
-while True:
-    x, y, my_life, his_life, torpedo, sonar, silence, mc = [int(i) for i in input().split()]  ####
-    sonar_result = input() ####
-
-    # his path 
-    his_order = input().replace('|', ' ').split() # his_order = ['move','N','Torpedo] ####
     
-    if 'MOVE' in his_order :
-        his_path.append(move(direction(his_order),his_laps))
-        his_laps += 1 # laps start from 0
+    """    
+    1 Pas d'embranchement'
+        A Obstacle
+        B Bout de path 
+            a sans embranchement avant 
+            b avec embranchement avant
+        C Autre : next cursor, tile
+    2 Avec embranchement
+        A Premier embranchement 
+            a Ostacle
+            b : Autre : next cursor, tile
+        B Dernière embranchement avec qqc après, obstacle :
+            a dernière Branche
+            b autre
+        C Dernière embanchement en bout de path :
+            a obstacle !!!
+            b Dernière Branche
+            c Autre
+        D Autre embranchement avec obstacle
 
-    else : 
-        if 'SILENCE' in his_order :
-            his_silence_count += 1
-            if his_silence_count > 1 : # if there is two silence we restat from 0, no path for this turn
-                his_path = []
-                his_laps = 0
-                his_silence_count = 0            
+    Modifier :    
 
-    if his_path :
-        map_ = run_map(brows_map,his_path,island)
-        print(f'MOVE N SILENCE | MSG {map_}')
-    else : print('MOVE N SILENCE')
+    1 Pas d'embranchement'
+        A Obstacle
+        B Bout de path 
+            a sans embranchement avant 
+            b avec embranchement avant
+        C Autre : next cursor, tile
+    2 Avec embranchement
+        A Dernière embranchement avec qqc après, obstacle :
+            a dernière Branche
+            b autre
+        B Dernière embanchement en bout de path :
+            a obstacle
+            b Dernière Branche
+            c Autre
+        C Autre embranchement [Tous sauf si dernier embranchement, a verifier]
+            a avec obstacle   
+            b Premier embranchement 
+            c : Autre : next cursor, tile
+    """
 
-"""
-    already.append((x,y))
-    decision, max_, isit = d_isit(his_order, max_, island)
-    if decision != 'wait' : z, result = hunt(x, y, isit, already, torpedo)
-    else : z, result = wait(x, y, silence, island, already)
-    if z == 'x' : already = []
-    print(result)
-        # f'| MSG {isit}'
+    junction = 'x'
+    start_cursor, cursor, branch = 0, 0, 0
+    tile = start_tile
+    while True :
+        if len(path[cursor]) == 1 :
+            if add(path[cursor][0], tile) not in brows_map:
+                print('1A Pas d embranchement , obstacle : fin')
+                return possible_path
+            elif cursor == len(path) :
+                possible_path += 1
+                if junction == 'x': # CONDITION SANS EMBRACNHEMENT
+                    print('1Ba Bout de path sans embranchement avant : fin')
+                    return possible_path
+                else :
+                    print('1Bb Bout de path avec embranchement avant : retour')
+                    cursor = start_cursor
+                    tile = start_tile
+            else : 
+                tile = add(path[cursor][0], tile)
+                cursor = path[cursor][0][2]
+                print(f' On avance cursor = {cursor}, tile = {tile}')
+                
+        else :
+            junction = 'o'
+            if all(len(k) == 1 for k in path[:cursor]) :
+                if add(path[cursor][0], tile) not in  brows_map:
+                    path[cursor].pop(0)
+                    junction = 'x'
+                    cursor = start_cursor
+                    tile = start_tile
+                    print('2Aa : premier embranchement, obstacle : retour')
+                else : 
+                    start_cursor = cursor
+                    start_tile = tile
+                    tile = add(path[cursor][0], tile)
+                    cursor = path[cursor][0][2]
+                    print('2Ab : premier embranchement, autre')
+                    print(f' next cursor = {cursor}, tile = {tile}')
+            try :
+                # nécéssaire à cause du cursor + 1 ci_dessous
+                if all(len(i) == 1 for i in path[cursor+1:]) and add(path[cursor][branch], tile) not in  brows_map :
+                    path[cursor].pop(branch)
+                    junction = 'x'
+                    if branch == len(path[cursor]) - 1  : 
+                        branch = 0
+                        print('2Ba : dernière embranchement, dernière branche, obstacle : retour')
+                    else : 
+                        branch += 1
+                        print('2Bb : dernière embranchement, autre branche, obstacle : retour')
+                    cursor = start_cursor
+                    tile = start_tile
+            except IndexError : 
+                # implique que l'on est en bout de path
+                if add(path[cursor][branch], tile) not in  brows_map :
+                    path[cursor].pop(branch)
+                    junction = 'x'
+                    # pas de branche+=1
+                    print('2Cb : dernière embranchement, dernière branche, Bout de path et obstacle : retour')
+                elif branch == len(path[cursor]) - 1 :
+                    path[start_cursor].pop(0)
+                    possible_path += 1
+                    junction = 'x'
+                    branch = 0
+                    print('2Cb : dernière embranchement, dernière branche, Bout de path : retour')
+                else : 
+                    possible_path += 1
+                    branch += 1
+                    print('2Cc : dernière embranchement, autre branche, Bout de path : retour')
+                cursor = start_cursor
+                tile = start_tile
 
-"""
+            else :
+                if add(path[cursor][0], tile) not in  brows_map:
+                    path[cursor].pop(0)
+                    junction = 'x'
+                    cursor = start_cursor
+                    tile = start_tile
+                    print('2D Avec embranchement, pas premier, pas dernier, obstacle : retour')
+                    
+
+def main():
+    
+    brows_map = [] # map de référence sans les îles
+    island = []
+    path = [[(-1,0,1)],[(0,1,2)],[(0,1,3)],[(1,0,4)],[(0,1,5)],[(1,0,6)],[(-3,0,7),(-2,0,7),(-1,0,7),(0,-3,7),(0,-2,7),(0,-1,7),(3,0,7),(2,0,7),(1,0,7),(0,3,7),(0,2,7),(0,1,7)],[(1,0,8)],[(0,-1,9)],[(1,0,10)],[(0,-1,11)],[(0,-1,12)],[(-1,0,13)],[(0,-1,14)],[(-3,0,15),(-2,0,15),(-1,0,15),(0,-3,15),(0,-2,15),(0,-1,15),(3,0,15),(2,0,15),(1,0,15),(0,3,15),(0,2,15),(0,1,15)],[(-1,0,16)],[(-1,0,17)],[(-1,0,18,8)]]
+    for x in range(15) :
+        for y in range(15) :
+            if (x,y) not in island : brows_map.append((x,y))
+    print(f'brows_map : {brows_map}')
+    print(f'path : {path}')
+    return run_map(brows_map,path)
+
+if __name__ == '__main__' : main()
+
+
+    
+# 1 Parcours de la map a  partir de (7,7) de manière concentrique
+#   a) Si ma case n'est pas dans island, je selection
+#   b) Sinon je prend la case suivant
+
+# 2 Creation d'un parcours de 16 tours le plus concentrique possible
+#   a) Si je parviens au 16 tours sans island et dans la map, je selection
+#   b) S'il reste d'autres possibilite, je recommance un autre parcours depuis la mÃªme case
+#   c) Si j'ai epuisee les possbilites (comment mesurer ?) je reparts Ã  1
+
+# 3 Mesure de la dilution du parcours au tours 16. 
+#   a) Si la dilution Ã  t.16 est superieur a  25 / 225 : je garde
+#   b) Sinon je relance le parcours a  2 qui peut me rediriger vers 1
