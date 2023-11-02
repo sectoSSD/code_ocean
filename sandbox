@@ -17,53 +17,111 @@ def sector (x,y) :
 def run_map(brows_map,path) : # brows_map designe une list de tuple sans les tuples des islands
     map_ = {}
     #for xy in brows_map :
-    xy = (1,1)
+    xy = (7,7)
     map_[xy] = run_path(xy, brows_map, path)
     return map_   
 
-def run_path(xy, brows_map, path): # nb : un seul 'sielence' possible
+def run_path(start_tile,  brows_map, path): # nb : un seul 'sielence' possible
 # list of list of tuples : [(x,y,laps,sector)],[()],[(),(),()],[()]
     possible_path = 0
-    i, j= 0, 0
-    loop = 'x'
     
+    """    
+    1 Pas d'embranchement'
+        A Obstacle
+        B Bout de path 
+            a sans embranchement avant 
+            b avec embranchement avant
+        C Autre : next cursor, tile
+    2 Avec embranchement
+        A Dernière embranchement avec qqc après :
+            a Obstacle : dernierère branche, autre branche
+            b Pas d'obstacle derniere branche : next cursor, branche, tile
+            c Pas d'obstacle autre branche : next cursor, branche, tile
+        B Dernière embanchement en bout de path :
+            a obstacle
+            b Dernière Branche
+            c Autre
+        C Autre embranchement :
+            a avec obstacle   
+            b Premier embranchement 
+            c Autre : next cursor, tile
+    """
+    
+    start_cursor, cursor, branch = 0, 0, 0
+    tile = start_tile
     while True :
-        if len(path[i]) == 1 : # sans embranchement
-            if add(path[i][0], xy) not in brows_map: # Obstacle
-                print('sur un island sans embranchement ou hors-jeu')
+        if len(path[cursor]) == 1 :
+            if add(path[cursor][0], tile) not in brows_map:
+                print('1A Pas d embranchement , obstacle : fin')
                 return possible_path
-            elif i == len(path) - 1 : # Au bout
-                print('en bout de path')
+            elif cursor == len(path) - 1 :
                 possible_path += 1
-                if loop == 'o':
-                    print('nouveau path')
-                    i = 0
-                else : 
+                if all(len(i) == 1 for i in path) :
+                    print('1Ba Bout de path sans embranchement avant : fin')
                     return possible_path
-        else : # a un enbranchement
-            if all(len(k) == 1 for k in path[i:]) : # en dernière embranchement ET SI Y A RIEN DERRIERE, PAUFINER !!
-            
-                if add(path[i][j], xy) not in brows_map : #'obstacle'
-                    print('obstacle en dernière branche')
-                    path[i].pop(j)
-                    i = 0
-                    loop = 'o'
-                elif  j == len(path[i]) - 1 : # au bout
-                    print('branche finit')
-                    for i in path :
-                        if len(i) > 1 : path[i].pop(0)
-                    i, j = 0, 0
-                    loop = 'o'
-                else : # nouvelle brache
-                    print('nouvelle dernière branche')
-                    j += 1
-                    loop = 'o'
-            else : # il y a des branche derrière
-                if add(path[i][0], xy) not in brows_map :
-                    print('obstacle a un enbranchement')
-                    path[i].pop(0)
-        print(f'on avance {path[i][0][2]}')
-        i = path[i][0][2]
+                else :
+                    print('1Bb Bout de path avec embranchement avant : retour')
+                    cursor = start_cursor
+                    tile = start_tile
+            else :
+                tile = add(path[cursor][0], tile)
+                cursor = path[cursor][0][2]
+                print(f'1C On avance cursor = {cursor}, tile = {tile}')       
+        else :
+            try :
+                # nécéssaire à cause du cursor + 1 ci_dessous
+                if all(len(i) == 1 for i in path[cursor+1:]) :
+                    if add(path[cursor][branch], tile) not in  brows_map :
+                        path[cursor].pop(branch)
+                        branch = (0,branch + 1)[branch == len(path[cursor]) - 1]
+                        cursor = start_cursor
+                        tile = start_tile
+                        print('2Aa : dernière embranchement (dernière branche,autre branche) obstacle : retour')
+                    else :
+                        tile = add(path[cursor][branch], tile)
+                        cursor = path[cursor][branch][2]
+                        if branch == len(path[cursor]) - 1 :
+                            if len(path[start_cursor]) != 1 : path[start_cursor].pop(0)
+                            branch += 1
+                            print(f'2Ab : dernière embranchement dernière branche On avance cursor = {cursor}, branche = {branch}, tile = {tile} ')
+                        else :
+                            branch = 0
+                            print(f'2Ac : dernière embranchement autre branche On avance cursor = {cursor}, branche = {branch}, tile = {tile} ')
+                        
+            except IndexError : 
+                # implique que l'on est en bout de path
+                if add(path[cursor][branch], tile) not in  brows_map :
+                    path[cursor].pop(branch)
+                    # pas de branche+=1
+                    print('2Ba : dernière embranchement, dernière branche, Bout de path et obstacle : retour')
+                elif branch == len(path[cursor]) - 1 :
+                    path[start_cursor].pop(0)
+                    possible_path += 1
+                    branch = 0
+                    print('2Bb : dernière embranchement, dernière branche, Bout de path : retour')
+                else : 
+                    possible_path += 1
+                    branch += 1
+                    print('2Bc : dernière embranchement, autre branche, Bout de path : retour')
+                cursor = start_cursor
+                tile = start_tile
+
+            else :
+                if any(len(i) != 1 for i in path[cursor+1:]) :
+                    if add(path[cursor][0], tile) not in  brows_map:
+                        path[cursor].pop(0)
+                        cursor = start_cursor
+                        tile = start_tile
+                        print('2Ca Avec embranchement obstacle : retour')
+                    else :
+                        cursor = path[cursor][0][2]
+                        tile = add(path[cursor][0], tile)
+                        print(f'2Cb On avance cursor = {cursor}, tile = {tile}')
+            finally :
+                if all(len(k) == 1 for k in path[:cursor]) :
+                    start_cursor = cursor
+                    start_tile = tile
+                    print(f'2Cc : premier embranchement : startcursor {cursor}')
 
 def main():
     
@@ -93,3 +151,4 @@ if __name__ == '__main__' : main()
 # 3 Mesure de la dilution du parcours au tours 16. 
 #   a) Si la dilution Ã  t.16 est superieur a  25 / 225 : je garde
 #   b) Sinon je relance le parcours a  2 qui peut me rediriger vers 1
+
