@@ -118,7 +118,7 @@ def run_path(start_tile,  brows_map, path): # nb : un seul 'sielence' possible
                         tile = add(path[cursor][0], tile)
                         print(f'2Cb On avance cursor = {cursor}, tile = {tile}')
             finally :
-                if all(len(k) == 1 for k in path[:cursor]) :
+                if all(len(k) == 1 for k in path[:cursor]) : # le cursor a deja bouger et correspond pas au bon point?
                     start_cursor = cursor
                     start_tile = tile
                     print(f'2Cc : premier embranchement : startcursor {cursor}')
