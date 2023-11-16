@@ -23,7 +23,8 @@ def I_no_fork(temp_path,cursor,branch,tile,brows_map,possible_path,start_cursor,
             print(f'1Aa Obstacle sans embanchement avant : tile = {tile} fin')
             next_loop = False
         else :
-            print('1Ab Obstacle avec embanchement avant : {start_cursor}retour')
+            print(f'1Ab Obstacle avec embanchement avant : {start_cursor} retour')
+            temp_path[start_cursor].pop(0) # ALGO LIMIT : DELETE TRUE POSSIBLE-PATH WHENE MORE THAN 2 FORK
             cursor = start_cursor
             tile = start_tile
             impediment = True
@@ -75,18 +76,20 @@ def IIB_least_fork(temp_path, cursor, tile, branch, brows_map, start_cursor, sta
 
 def IIC_least_fork_end_path(temp_path, cursor, tile, branch, brows_map, start_cursor, start_tile, possible_path, impediment):
     if add(temp_path[cursor][branch], tile) not in  brows_map :
-        print('2Ca : dernière embranchement, dernière branche, Bout de path, obstacle : retour')
-    elif branch == len(temp_path[cursor]) - 1 :
+        impediment = False
+        print('2Ca : dernière embranchement obstacle : retour')
+    if branch == len(temp_path[cursor]) - 1 :
         temp_path[start_cursor].pop(0)
         if impediment == True : possible_path += 1
         else : impediment = True
         branch = 0
-        print('2Cb : dernière embranchement, dernière branche, Bout de temp_path : retour')
+        print('2Cb : dernière embranchement, dernière branche, Bout de path : retour')
     else : 
         if impediment == True : possible_path += 1
         else : impediment = True
-        branch += 1
-        print('2Cc : dernière embranchement, autre branche, Bout de temp_path : retour')
+        if start_cursor == cursor : temp_path[cursor].pop(0) # on pop si rien avant
+        else : branch += 1
+        print('2Cc : dernière embranchement, autre branche, Bout de path : retour')
     cursor = start_cursor
     tile = start_tile
     return temp_path, cursor, tile, branch, possible_path, impediment
@@ -115,6 +118,7 @@ def run_map(brows_map,path) :
 
 def run_path(start_tile, brows_map, temp_path):
     # list of list of tuples : [(x,y,laps,sector)],[()],[(),(),()],[()]
+    # don't see all the combination after three silence
     """    
     1 Pas d'embranchement'
         A Obstacle
@@ -154,13 +158,13 @@ def run_path(start_tile, brows_map, temp_path):
         else :
             start_cursor, start_tile = IIA_first_fork(
                 temp_path, cursor, tile, start_cursor, start_tile)
-            try :
-                if all(len(i) == 1 for i in temp_path[cursor+1:]) :
+            if all(len(i) == 1 for i in temp_path[cursor+1:]) :
+                if cursor != len(temp_path) - 1 :
                     temp_path, cursor, tile, branch, impediment = IIB_least_fork(
                         temp_path, cursor, tile, branch, brows_map, start_cursor, start_tile, impediment)  
-            except IndexError :
-                temp_path, cursor, tile, branch, possible_path, impediment = IIC_least_fork_end_path(
-                    temp_path, cursor, tile, branch, brows_map, start_cursor, start_tile, possible_path, impediment)
+                else :
+                    temp_path, cursor, tile, branch, possible_path, impediment = IIC_least_fork_end_path(
+                        temp_path, cursor, tile, branch, brows_map, start_cursor, start_tile, possible_path, impediment)
 
             else :
                 if any(len(i) != 1 for i in temp_path[cursor+1:]) :
@@ -169,11 +173,13 @@ def run_path(start_tile, brows_map, temp_path):
 
 def main():
     brows_map = [] # map de référence sans les îles
-    island = []
+    island = [(7,7),(7,6),(6,6),(6,7)]
     path = [[(-1, 0, 1)], [(0, 1, 2)], [(1, 0, 3)], [(1, 0, 4)], [(0, -1, 5)], [(0, -1, 6)], 
-            [(-1, 0, 7)], [(-1, 0, 8)], [(-1, 0, 9)], [(0, 1, 10)], [(0, 1, 11)], [(0, 1, 12)], 
-            [(1, 0, 13), (0,1,13)], 
-            [(1, 0, 14)], [(1, 0, 15)], [(1, 0, 16)], [(0, -1, 17)], [(0, -1, 18)], [(0, -1, 19)]]
+            [(-1, 0, 7)], [(-1, 0, 8)], [(-1, 0, 9)], [(0, 1, 10)], [(0, 1, 11)], 
+            [(0, 1, 12), (1,0,12)],
+            [(0, 1, 13)],[(0, 1, 14)],[(0, 1, 15,)],
+            [(0, 1, 16),(1, 0, 16)]]
+            
 
     for x in range(15) :
         for y in range(15) :
@@ -183,3 +189,5 @@ def main():
     return run_map(brows_map,path)
 
 if __name__ == '__main__' : main()
+
+# PROCHAINE ETAPE : INTEGRER LES SECTORS
