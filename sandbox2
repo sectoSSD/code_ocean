@@ -1,0 +1,262 @@
+
+def add (tuple_1, tuple_2, laps='',sector='') :
+    if laps : return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1], laps
+    elif sector : return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1], laps, sector
+    else : return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
+
+def current_path(xy, path) : return list(map(lambda xy_path : add(xy, xy_path), path))
+#???
+def sector (x,y) :
+    sector = {0: [ 0,15, 0,15],
+              1: [ 0, 5, 0, 5], 2 : [ 0, 5, 5,10], 3 : [ 0, 5,10,15],
+              4: [ 5,10, 0, 5], 5 : [ 5,10, 5,10], 6 : [ 5,10,10,15],
+              7: [10,15, 0, 5], 8 : [10,15, 5,10], 9 : [10,15,10,15]}
+    for i in '1234567890' : # 0 must be least
+        if sector[i][0] <= x <= sector[i][1] and sector[i][2] <= y < sector[i][3] : 
+            return i
+
+def config_fork_map(dir_) :
+    fork_map = {'fork' : {}, 'max' : {}, 'fork-index': {}, 'index-fork' : {}}
+    index = 0
+    for fork in range(len(dir_)) :
+        if len(dir_[fork]) != 1 :
+            fork_map['fork'][fork] = 0
+            fork_map['max'][fork] = len(dir_[fork])
+            fork_map['fork-index'][fork] = index
+            fork_map['index-fork'][index] = fork
+            index += 1
+    return fork_map
+
+def del_fork_map(fork_map, fork) :
+    index = fork_map['fork-index'][fork] 
+    for cursor in ['fork', 'max', 'fork-index'] : del fork_map[cursor][fork]
+    del fork_map['index-fork'][index]
+    return fork_map
+
+def update_fork_map(fork, fork_map): 
+    fork_map['fork'][fork] += 1
+    while fork_map['fork'][fork] > fork_map['max'][fork] :
+        index = fork_map['fork-index'][fork]
+        index -= 1 if index - 1 >= 0 else 0
+        fork_map = del_fork_map(fork_map, fork)
+        try :
+            fork = fork_map['index-fork'][index]
+            fork_map['fork'][fork] += 1    
+        except KeyError : break
+    return fork_map
+
+####
+
+def I_no_fork(dir_, sect, cursor, tile, fork, fork_map, brows_map, impediment, next_loop) :
+    tile = add(dir_[cursor][0], tile)
+    if tile not in brows_map or sect[cursor] != sect(dir_[cursor][0]):   
+        impediment = True
+        """
+        Creation de fonction pour gérer Fork_map terminé.
+        Changer toutes les variables recquise suivant nouvelle norme
+        Change l'implémentation des partie avec embranchement
+        Bref on se laisse descendre ...
+        """
+        if fork :
+            fork = update_fork_map(fork, fork_map, dir_)
+            print(f'1Aa Obstacle avec embanchement avant : {tile} retour')
+        else :
+            print(f'1Ab Obstacle sans embanchement avant : tile = {tile} fin')
+            next_loop = False
+            
+    elif cursor == len(dir_) - 1 :
+        if impediment == False : possible_path += 1
+        else : impediment = True
+        if all(len(i) == 1 for i in path) :
+            print(f'1Ba Bout de path sans embranchement avant : {possible_path} fin')
+            next_loop = False
+        else :
+            print('1Bb Bout de path avec embranchement avant : retour')
+            path[start_cursor].pop(0)
+            cursor = start_cursor
+            tile = start_tile
+            impediment = True
+    else :
+        tile = add(path[cursor][0], tile)
+        cursor = path[cursor][0][2]
+        print(f'1C On avance cursor = {cursor}, tile = {tile}')      
+    return cursor, branch, tile, possible_path, next_loop, impediment
+
+def IIA_first_fork(path, cursor, tile, start_cursor, start_tile) :
+    if all(len(k) == 1 for k in path[:cursor]) : 
+        print(f'A : premier embranchement : startcursor {cursor}')
+        return cursor, tile
+    else : return  start_cursor, start_tile
+
+def IIB_least_fork(path, cursor, tile, branch, brows_map, start_cursor, start_tile, impediment) :
+    if branch == len(path[cursor]) - 1 :
+        if add(path[cursor][branch], tile) not in  brows_map :
+            impediment = False
+            print(f'2Ba1 : dernière embranchement avec qqc après, dernière branche, obstacle, cursor = {cursor}, branche = {branch}, tile = {tile}, retour  ')
+        else :
+            tile = add(path[cursor][branch], tile)
+            cursor = path[cursor][branch][2]
+            print(f'2Ba2 : dernière embranchement avec qqc après, dernière branche On avance cursor = {cursor}, branche = {branch}, tile = {tile} ')
+        path[start_cursor].pop(0)
+        branch = 0
+    else :
+        if add(path[cursor][branch], tile) not in  brows_map :
+            impediment = False
+            print('2Bb1 : dernière embranchement avec qqc après, autre branche, obstacle : , cursor = {cursor}, branche = {branch}, tile = {tile}, retour')
+        else :
+            tile = add(path[cursor][branch], tile)
+            cursor = path[cursor][branch][2]
+            print(f'2Bb2 : dernière embranchement avec qqc après, autre branche cursor = {cursor}, branche = {branch}, tile = {tile}, on avance ')
+        branch += 1
+    return path, cursor, tile, branch, impediment
+
+def IIC_least_fork_end_path(path, cursor, tile, branch, brows_map, start_cursor, start_tile, possible_path, impediment):
+    if add(path[cursor][branch], tile) not in  brows_map :
+        impediment = False
+        print('2Ca : dernière embranchement obstacle : retour')
+    if branch == len(path[cursor]) - 1 :
+        path[start_cursor].pop(0)
+        if impediment == True : possible_path += 1
+        else : impediment = True
+        branch = 0
+        print('2Cb : dernière embranchement, dernière branche, Bout de path : retour')
+    else : 
+        if impediment == True : possible_path += 1
+        else : impediment = True
+        if start_cursor == cursor : path[cursor].pop(0) # on pop si rien avant
+        else : branch += 1
+        print('2Cc : dernière embranchement, autre branche, Bout de path : retour')
+    cursor = start_cursor
+    tile = start_tile
+    return path, cursor, tile, branch, possible_path, impediment
+
+def IID_other_fork(path, cursor, tile, start_cursor, start_tile, brows_map, impediment) :
+    if add(path[cursor][0], tile) not in  brows_map: 
+        impediment = False
+        print('2Da Avec embranchement, obstacle : on avance')
+    else :
+        print(f'2Db On avance cursor = {cursor}, tile = {tile}')
+    cursor = path[cursor][0][2]
+    tile = add(path[cursor][0], tile)  
+    return path, cursor, tile, impediment 
+
+###
+
+def run_map(brows_map,path) : 
+    # brows_map designe une list de tuple sans les tuples des islands
+    map_ = {}
+    for tile in brows_map :
+        map_[tile] = run_path(tile, brows_map, path)
+        print(f'next_tile : {tile}')
+    print(f'fin de run_map : {map_}')
+    return map_   
+
+def run_path(tile, brows_map, dir_, sect):
+   # list of list of tuples : [(x, y, sector)],[()],[(),(),()],[()]
+   # dir_= [ [()], [()], [(),(),()], [()], [()] ], sect = [0,0,0,1]
+    """ 
+    1 Pas d'embranchement'
+        A Obstacle
+            a sans embranchement avant 
+            b avec embranchement avant
+        B Bout de path 
+            a sans embranchement avant 
+            b avec embranchement avant
+        C Autre : next cursor, tile
+    2 Avec embranchement
+        A Premier embranchement 
+        B Dernière embranchement avec qqc après :
+            a dernière branche :
+                1 obstacle
+                2 autre  next cursor, tile
+            b autre branche :
+                1 obstacle
+                2 autre  next cursor, tile
+        C Dernière embanchement en bout de path :
+            a obstacle
+            b Dernière Branche
+            c Autre
+        D Autre embranchement :
+            a avec obstacle   
+            b Autre : next cursor, tile
+    
+    -----------------
+    
+    I Pas d'embranche
+        A Obstacle
+            a sans embranchement avant 
+            b avec embranchement avant
+        B Bout de path 
+            a sans embranchement avant 
+            b avec embranchement avant
+        C Autre : next cursor, tile
+    B Embranchement
+        A Obstacle
+        B Dernière Branche
+        C Bout de Path
+    
+    
+    
+    """
+    possible_path = 0
+    cursor = 0
+    
+    fork = ''
+    fork_map = {}
+    tile_cursor = tile
+     # ???
+    next_loop = True
+    impediment = True
+    end_path = False
+    while True :
+        
+        
+        if len(dir_[cursor]) == 1 :
+            cursor, tile_cursor, fork, fork_map, next_loop, impediment = I_no_fork(
+                dir_, sect, cursor, tile, fork, fork_map, brows_map, impediment, next_loop)
+        
+        else :
+            start_cursor, start_tile = IIA_first_fork(
+                path, cursor, tile, start_cursor, start_tile)
+            if all(len(i) == 1 for i in path[cursor+1:]) :
+                if cursor != len(path) - 1 :
+                    path, cursor, tile, branch, impediment = IIB_least_fork(
+                        path, cursor, tile, branch, brows_map, start_cursor, start_tile, impediment)  
+                else :
+                    path, cursor, tile, branch, possible_path, impediment = IIC_least_fork_end_path(
+                        path, cursor, tile, branch, brows_map, start_cursor, start_tile, possible_path, impediment)
+
+            else :
+                if any(len(i) != 1 for i in path[cursor+1:]) :
+                    path, cursor, tile, impediment = IID_other_fork(
+                        path, cursor, tile, start_cursor, start_tile, brows_map, impediment)
+            
+            if end_path == True :
+                if impediment == False : possible_path += 1
+                if next_loop = True : 
+                    cursor = 0
+                    tile_cursor = tile 
+            if next_loop == False : return possible_path
+            
+            
+def main():
+    brows_map = [] # map de référence sans les îles
+    island = [(7,7),(7,6),(6,6),(6,7)]
+    # refair avec nouveau model
+    path = [[(-1, 0, 0)], [(0, 1, 0)], [(1, 0, 0)], [(1, 0, 0)], [(0, -1, 0)], [(0, -1, 0)], 
+            [(-1, 0, 0)], [(-1, 0, 0)], [(-1, 0, 0)], [(0, 1, 0)], [(0, 1, 0)], 
+            [(0, 1, 0), (1,0,0)],
+            [(0, 1, 0)],[(0, 1, 0)],[(0, 1, 0)],
+            [(0, 1, 0),(1, 0, 0)]]
+            
+
+    for x in range(15) :
+        for y in range(15) :
+            if (x,y) not in island : brows_map.append((x,y))
+    print(f'brows_map : {brows_map}')
+    print(f'path : {path}')
+    return run_map(brows_map,path)
+
+if __name__ == '__main__' : main()
+
+# PROCHAINE ETAPE : INTEGRER LES SECTORS
