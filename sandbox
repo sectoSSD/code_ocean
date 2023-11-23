@@ -5,189 +5,163 @@ def add (tuple_1, tuple_2, laps='',sector='') :
     elif sector : return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1], laps, sector
     else : return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
 
-def current_path(xy, path) : return list(map(lambda xy_path : add(xy, xy_path), path))
+def current_path (xy, path) : return list(map(lambda xy_path : add(xy, xy_path), path))
 
-def sector (x,y) :
-    sector = {'1': [0,5,0,5],  '2' : [0,5,5,10],  '3' : [0,5,10,15],
-              '4': [5,10,0,5],  '5' : [5,10,5,10],  '6' : [5,10,10,15],
-              '7': [10,15,0,5],'8' : [10,15,5,10],'9' : [10,15,10,15]}
-    for i in '123456789' :
-        if sector[i][0] <= x <= sector[i][1] and sector[i][2] <= y < sector[i][3] : return i
-    return 'x'
+def debug_1(controller, cursor, fork_map, tile, r = '') :
+        """ position in debug line:
+        1           tile                      -> tile from which dir_ starts to browse 
+        2           cursor['idx']             -> index in dir_
+        3           block/end_path            -> when blocking or end_path is true
+        4           cursor['fork']            -> on wich cursor['fork']' we are
+        5 fork_map['fork']/fork_map['max']    -> main information on the situation in fork_map
+        '_' if nothing
+        """
+        show = (max([controller['blocking'], controller['end_path']]),
+                controller['blocking'],
+                controller['end_path']) 
+        fork_map_situation = [str(fork) + '/' + str(max_)
+                              for fork in list(fork_map['fork'].values())
+                              for max_ in list(fork_map['max'].values()) ]
+        space = ' ' * 25 if tile[1] % 2 != 0 else '' # just to see more tile changing
+        r += (space + str(tile)) * show[0]
+        r += (' ' + str(cursor['idx'])) * show[0]
+        r += (' ' + ('block')) * show[1]
+        r += (' ' + ('end_path')) * show[2]
+        r += (' ' + str(cursor['fork'] if cursor['fork'] != '' else '_')) * show[0]
+        r += (' ' + str(*fork_map_situation if fork_map_situation else '_'))* show[0]
+        if r : print(r)
+        else : pass
 
-###
+def off_side (xy, size) :
+    off_side = False
+    for i in xy :
+        if size <= i or i < 0 : off_side = True
+    return off_side
 
-def I_no_fork(temp_path,cursor,branch,tile,brows_map,possible_path,start_cursor,start_tile,next_loop,impediment) :
-    if add(temp_path[cursor][0], tile) not in brows_map:
-        if all(len(k) == 1 for k in temp_path[:cursor]) :
-            print(f'1Aa Obstacle sans embanchement avant : tile = {tile} fin')
-            next_loop = False
-        else :
-            print(f'1Ab Obstacle avec embanchement avant : {start_cursor} retour')
-            temp_path[start_cursor].pop(0) # ALGO LIMIT : DELETE TRUE POSSIBLE-PATH WHENE MORE THAN 2 FORK
-            cursor = start_cursor
-            tile = start_tile
-            impediment = True
-    elif cursor == len(temp_path) - 1 :
-        if impediment == True : possible_path += 1
-        else : impediment = True
-        if all(len(i) == 1 for i in temp_path) :
-            print(f'1Ba Bout de path sans embranchement avant : {possible_path} fin')
-            next_loop = False
-        else :
-            print('1Bb Bout de path avec embranchement avant : retour')
-            temp_path[start_cursor].pop(0)
-            cursor = start_cursor
-            tile = start_tile
-            impediment = True
-    else :
-        tile = add(temp_path[cursor][0], tile)
-        cursor = temp_path[cursor][0][2]
-        print(f'1C On avance cursor = {cursor}, tile = {tile}')      
-    return cursor, branch, tile, possible_path, next_loop, impediment
+def initial_cursor(dir_map, fork_map, tile) :
+    # 'dir' : current position in dir_map
+    # 'idx' : current index in dir_map
+    # 'fork' : least embranchement '' if no fork
+    # 'tile' : current tile on map
+    init_cursor = {'dir' : (), 'idx' : 0, 'fork' : '', 'tile' : tile }
+    if fork_map['fork'].get(0) != None : init_cursor['dir'] = dir_map[0][fork_map['fork'][0]-1]
+    else : init_cursor['dir'] = dir_map[0][0]
+    return init_cursor
 
-def IIA_first_fork(temp_path, cursor, tile, start_cursor, start_tile) :
-    if all(len(k) == 1 for k in temp_path[:cursor]) : 
-        print(f'A : premier embranchement : startcursor {cursor}')
-        return cursor, tile
-    else : return  start_cursor, start_tile
+def update_cursor (cursor, dir_map, fork_map) :
+    cursor['idx'] += 1
+    if fork_map['fork'].get(cursor['idx']) != None :
+        cursor['dir'] = dir_map[ cursor['idx'] ] [ fork_map['fork'][cursor] ]
+    else : cursor['dir'] = dir_map[ cursor['idx'] ] [0]
+    cursor['tile'] = add(cursor['dir'], cursor['tile'])
+    return cursor
 
-def IIB_least_fork(temp_path, cursor, tile, branch, brows_map, start_cursor, start_tile, impediment) :
-    if branch == len(temp_path[cursor]) - 1 :
-        if add(temp_path[cursor][branch], tile) not in  brows_map :
-            impediment = False
-            print(f'2Ba1 : dernière embranchement avec qqc après, dernière branche, obstacle, cursor = {cursor}, branche = {branch}, tile = {tile}, retour  ')
-        else :
-            tile = add(temp_path[cursor][branch], tile)
-            cursor = temp_path[cursor][branch][2]
-            print(f'2Ba2 : dernière embranchement avec qqc après, dernière branche On avance cursor = {cursor}, branche = {branch}, tile = {tile} ')
-        temp_path[start_cursor].pop(0)
-        branch = 0
-    else :
-        if add(temp_path[cursor][branch], tile) not in  brows_map :
-            impediment = False
-            print('2Bb1 : dernière embranchement avec qqc après, autre branche, obstacle : , cursor = {cursor}, branche = {branch}, tile = {tile}, retour')
-        else :
-            tile = add(temp_path[cursor][branch], tile)
-            cursor = temp_path[cursor][branch][2]
-            print(f'2Bb2 : dernière embranchement avec qqc après, autre branche cursor = {cursor}, branche = {branch}, tile = {tile}, on avance ')
-        branch += 1
-    return temp_path, cursor, tile, branch, impediment
-
-def IIC_least_fork_end_path(temp_path, cursor, tile, branch, brows_map, start_cursor, start_tile, possible_path, impediment):
-    if add(temp_path[cursor][branch], tile) not in  brows_map :
-        impediment = False
-        print('2Ca : dernière embranchement obstacle : retour')
-    if branch == len(temp_path[cursor]) - 1 :
-        temp_path[start_cursor].pop(0)
-        if impediment == True : possible_path += 1
-        else : impediment = True
-        branch = 0
-        print('2Cb : dernière embranchement, dernière branche, Bout de path : retour')
-    else : 
-        if impediment == True : possible_path += 1
-        else : impediment = True
-        if start_cursor == cursor : temp_path[cursor].pop(0) # on pop si rien avant
-        else : branch += 1
-        print('2Cc : dernière embranchement, autre branche, Bout de path : retour')
-    cursor = start_cursor
-    tile = start_tile
-    return temp_path, cursor, tile, branch, possible_path, impediment
-
-def IID_other_fork(temp_path, cursor, tile, start_cursor, start_tile, brows_map, impediment) :
-    if add(temp_path[cursor][0], tile) not in  brows_map: 
-        impediment = False
-        print('2Da Avec embranchement, obstacle : on avance')
-    else :
-        print(f'2Db On avance cursor = {cursor}, tile = {tile}')
-    cursor = temp_path[cursor][0][2]
-    tile = add(temp_path[cursor][0], tile)  
-    return temp_path, cursor, tile, impediment 
-
-###
-
-def run_map(brows_map,path) : 
-    # brows_map designe une list de tuple sans les tuples des islands
-    map_ = {}
-    for start_tile in brows_map :
-        temp_path = copy.deepcopy(path)
-        map_[start_tile] = run_path(start_tile, brows_map, temp_path)
-        print(f'next_tile : {start_tile}')
-    print(f'fin de run_map : {map_}')
-    return map_   
-
-def run_path(start_tile, brows_map, temp_path):
-    # list of list of tuples : [(x,y,laps,sector)],[()],[(),(),()],[()]
-    # don't see all the combination after three silence
-    """    
-    1 Pas d'embranchement'
-        A Obstacle
-            a sans embranchement avant 
-            b avec embranchement avant
-        B Bout de path 
-            a sans embranchement avant 
-            b avec embranchement avant
-        C Autre : next cursor, tile
-    2 Avec embranchement
-        A Premier embranchement 
-        B Dernière embranchement avec qqc après :
-            a dernière branche :
-                1 obstacle
-                2 autre  next cursor, tile
-            b autre branche :
-                1 obstacle
-                2 autre  next cursor, tile
-        C Dernière embanchement en bout de path :
-            a obstacle
-            b Dernière Branche
-            c Autre
-        D Autre embranchement :
-            a avec obstacle   
-            b Autre : next cursor, tile
-    """
-    possible_path = 0
-    start_cursor, cursor, branch = 0, 0, 0
-    tile = start_tile
-    next_loop = True
-    impediment = True
-    while True :
-        if len(temp_path[cursor]) == 1 :
-            cursor, branch, tile, possible_path, next_loop, impediment = I_no_fork(
-                temp_path,cursor,branch,tile,brows_map,possible_path,start_cursor,start_tile,next_loop, impediment)
-            if next_loop == False : return possible_path
-        else :
-            start_cursor, start_tile = IIA_first_fork(
-                temp_path, cursor, tile, start_cursor, start_tile)
-            if all(len(i) == 1 for i in temp_path[cursor+1:]) :
-                if cursor != len(temp_path) - 1 :
-                    temp_path, cursor, tile, branch, impediment = IIB_least_fork(
-                        temp_path, cursor, tile, branch, brows_map, start_cursor, start_tile, impediment)  
-                else :
-                    temp_path, cursor, tile, branch, possible_path, impediment = IIC_least_fork_end_path(
-                        temp_path, cursor, tile, branch, brows_map, start_cursor, start_tile, possible_path, impediment)
-
-            else :
-                if any(len(i) != 1 for i in temp_path[cursor+1:]) :
-                    temp_path, cursor, tile, impediment = IID_other_fork(
-                        temp_path, cursor, tile, start_cursor, start_tile, brows_map, impediment)
-
-def main():
-    brows_map = [] # map de référence sans les îles
-    island = [(7,7),(7,6),(6,6),(6,7)]
-    path = [[(-1, 0, 1)], [(0, 1, 2)], [(1, 0, 3)], [(1, 0, 4)], [(0, -1, 5)], [(0, -1, 6)], 
-            [(-1, 0, 7)], [(-1, 0, 8)], [(-1, 0, 9)], [(0, 1, 10)], [(0, 1, 11)], 
-            [(0, 1, 12), (1,0,12)],
-            [(0, 1, 13)],[(0, 1, 14)],[(0, 1, 15,)],
-            [(0, 1, 16),(1, 0, 16)]]
+def sector (xy) :
+    sector = {'1': [ 0, 5, 0, 5], '2' : [ 0, 5, 5,10], '3' : [ 0, 5,10,15],
+              '4': [ 5,10, 0, 5], '5' : [ 5,10, 5,10], '6' : [ 5,10,10,15],
+              '7': [10,15, 0, 5], '8' : [10,15, 5,10], '9' : [10,15,10,15]}
+    for i in '123456789' : # 0 must be least
+        if sector[i][0] <= xy[0] < sector[i][1] and sector[i][2] <= xy[1] < sector[i][3] : 
+            return int(i)
             
+def config_fork_map (dir_) :
+    # how fork_map is built :
+    fork_map = {'fork' : {}, 'max' : {}, 'fork-index': {}, 'index-fork' : {}}
+    index = 0
+    for fork in range(len(dir_)) :
+        if len(dir_[fork]) != 1 :
+            fork_map['fork'][fork] = 0
+            fork_map['max'][fork] = len(dir_[fork])
+            fork_map['fork-index'][fork] = index
+            fork_map['index-fork'][index] = fork
+            index += 1
+    return fork_map
 
-    for x in range(15) :
-        for y in range(15) :
-            if (x,y) not in island : brows_map.append((x,y))
-    print(f'brows_map : {brows_map}')
-    print(f'path : {path}')
-    return run_map(brows_map,path)
+def del_fork_map (fork_map, fork) :
+    index = fork_map['fork-index'][fork] 
+    for cursor in ['fork', 'max', 'fork-index'] : del fork_map[cursor][fork]
+    del fork_map['index-fork'][index]
+    return fork_map
+
+def update_fork_map(fork, fork_map): 
+    fork_map['fork'][fork] += 1
+    while fork_map['fork'][fork] > fork_map['max'][fork] :
+        index = fork_map['fork-index'][fork]
+        index -= 1 if index - 1 >= 0 else 0
+        fork_map = del_fork_map(fork_map, fork)
+        try :
+            fork = fork_map['index-fork'][index]
+            fork_map['fork'][fork] += 1    
+        except KeyError : break
+    return fork_map
+
+def blocking(cursor, play_map, sector_map):
+    # block when out of the game map or when on island
+    blocking = False
+    if (    cursor['tile'] in play_map['island']
+         or sector_map.get(cursor['idx']) == sector(cursor['tile'])
+         or off_side(cursor['tile'], play_map['size']) 
+        ): blocking = True
+    return blocking
+
+###
+
+def run_map(play_map, dir_map, sector_map, init_fork_map) : 
+    possible_path = {}
+    fork_map = copy.deepcopy(init_fork_map)
+    for tile in play_map['brows'] :
+        possible_path[tile] = run_path(tile, play_map, sector_map, dir_map, fork_map)
+    print(f'fin {possible_path}')
+    return possible_path
+
+def run_path(tile, play_map, sector_map, dir_map, fork_map) :
+   # define dir_ and sector when necessary
+    cursor = initial_cursor(dir_map, fork_map, tile)
+    controller = {'blocking' : False,  'end_path' : False}
+    possible_path = 0 # possible path for this tile
+    
+    while True :
+        
+        "A : embranchement : oui / non , quel cursor "
+        if fork_map['fork'].get(cursor['idx']) != None : 
+            cursor['fork'] = cursor['idx']
+        "B : obstacle : " 
+        controller['blocking'] = blocking(cursor, play_map, sector_map)
+        "C : bout de path : " 
+        controller['end_path'] = True if cursor['idx'] == len(dir_map) - 1 else False
+
+        debug_1(controller, cursor, fork_map, tile) # DEBUG MOD
+        " On se bagarre avec les variable et le deboggeur : Regarder le deboggeur pour la suite"
+        
+        if fork_map['fork'].get(cursor['idx']) != None :
+            fork_map = update_fork_map(cursor['fork'], fork_map)
+            
+        if cursor['fork'] != '' :
+            if controller['blocking'] == True or controller['end_path'] == True :
+                cursor = initial_cursor(dir_map, fork_map, tile)
+            if controller['blocking'] == True : pass
+            if controller['end_path'] == True : possible_path += 1
+        else :
+            if controller['end_path'] == True : possible_path += 1
+            if controller['blocking'] == True or controller['end_path'] == True :
+                return possible_path
+        
+        cursor = update_cursor(cursor, dir_map, fork_map)
+         
+def main():
+
+    size = 15
+    island = []
+    brows = [(x,y) for x in range(size) for y in range(size) if (x,y) not in island]
+    play_map = {'island' : island, 'size' : size, 'brows' : brows}
+    sector_map = {} # { cursor : sector }
+    dir_map = [[(-1, 0), (1,0)], 
+               [(0, 1, 0)], [(1, 0)], [(1, 0)], [(0, -1)], [(0, -1)], 
+              [(-1, 0)], [(-1, 0)], [(-1, 0)], [(0, 1)], [(0, 1)], [(0, 1)],
+              [(0, 1)],[(0, 1)],[(0, 1)],[(0, 1)]]
+    init_fork_map = config_fork_map(dir_map) # map of embranchement
+    print(f"play_map : {play_map['island']}")
+    print(f'dir_map : {dir_map}')
+    return run_map(play_map, dir_map, sector_map, init_fork_map)
 
 if __name__ == '__main__' : main()
-
-# PROCHAINE ETAPE : INTEGRER LES SECTORS
