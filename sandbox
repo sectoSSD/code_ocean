@@ -7,7 +7,7 @@ def add (tuple_1, tuple_2, laps='',sector='') :
 
 def current_path (xy, path) : return list(map(lambda xy_path : add(xy, xy_path), path))
 
-def debug_1(controller, cursor, fork_map, tile, r = '') :
+def debug_1(controller, cursor, fork_map, tile, cmd = '', r = '') :
         """ position in debug line:
         1           tile                      -> tile from which dir_ starts to browse 
         2           cursor['idx']             -> index in dir_
@@ -15,6 +15,7 @@ def debug_1(controller, cursor, fork_map, tile, r = '') :
         4           cursor['fork']            -> on wich cursor['fork']' we are
         5 fork_map['fork']/fork_map['max']    -> main information on the situation in fork_map
         '_' if nothing
+        OPTION : if cmd = 'cursor','fork_map', 'controller' print one or several contain
         """
         show = (max([controller['blocking'], controller['end_path']]),
                 controller['blocking'],
@@ -29,14 +30,30 @@ def debug_1(controller, cursor, fork_map, tile, r = '') :
         r += (' ' + ('end_path')) * show[2]
         r += (' ' + str(cursor['fork'] if cursor['fork'] != '' else '_')) * show[0]
         r += (' ' + str(*fork_map_situation if fork_map_situation else '_'))* show[0]
+        r += (' ' + str(controller['stop'])) * show[0]
+        if  'fork_map' in cmd : r += (' ' + str(fork_map)) * show[0]
+        if 'cursor' in cmd : r += (' ' + str(cursor)) * show[0]
+        if 'controller' in cmd : r += (' ' + str(controller))* show[0]
         if r : print(r)
         else : pass
+
+# run path : map
 
 def off_side (xy, size) :
     off_side = False
     for i in xy :
         if size <= i or i < 0 : off_side = True
     return off_side
+
+def sector (xy) :
+    sector = {'1': [ 0, 5, 0, 5], '2' : [ 0, 5, 5,10], '3' : [ 0, 5,10,15],
+              '4': [ 5,10, 0, 5], '5' : [ 5,10, 5,10], '6' : [ 5,10,10,15],
+              '7': [10,15, 0, 5], '8' : [10,15, 5,10], '9' : [10,15,10,15]}
+    for i in '123456789' : # 0 must be least
+        if sector[i][0] <= xy[0] < sector[i][1] and sector[i][2] <= xy[1] < sector[i][3] : 
+            return int(i)
+
+# run path : cursor
 
 def initial_cursor(dir_map, fork_map, tile) :
     # 'dir' : current position in dir_map
@@ -56,13 +73,7 @@ def update_cursor (cursor, dir_map, fork_map) :
     cursor['tile'] = add(cursor['dir'], cursor['tile'])
     return cursor
 
-def sector (xy) :
-    sector = {'1': [ 0, 5, 0, 5], '2' : [ 0, 5, 5,10], '3' : [ 0, 5,10,15],
-              '4': [ 5,10, 0, 5], '5' : [ 5,10, 5,10], '6' : [ 5,10,10,15],
-              '7': [10,15, 0, 5], '8' : [10,15, 5,10], '9' : [10,15,10,15]}
-    for i in '123456789' : # 0 must be least
-        if sector[i][0] <= xy[0] < sector[i][1] and sector[i][2] <= xy[1] < sector[i][3] : 
-            return int(i)
+# run_path : fork_map
             
 def config_fork_map (dir_) :
     # how fork_map is built :
@@ -95,6 +106,8 @@ def update_fork_map(fork, fork_map):
         except KeyError : break
     return fork_map
 
+# run_path : controller
+
 def blocking(cursor, play_map, sector_map):
     # block when out of the game map or when on island
     blocking = False
@@ -104,12 +117,21 @@ def blocking(cursor, play_map, sector_map):
         ): blocking = True
     return blocking
 
+def stop(fork_map) :
+    if len(fork_map['fork'].keys()) != len(fork_map['max'].keys()) : 
+        raise ValueError('fork_map')
+    if (len(fork_map['fork'].keys()) == 1 and 
+        list(fork_map['fork'].values()) == list(fork_map['max'].values())) :
+        return True
+    else : return False
+
+
 ###
 
 def run_map(play_map, dir_map, sector_map, init_fork_map) : 
     possible_path = {}
-    fork_map = copy.deepcopy(init_fork_map)
     for tile in play_map['brows'] :
+        fork_map = copy.deepcopy(init_fork_map)
         possible_path[tile] = run_path(tile, play_map, sector_map, dir_map, fork_map)
     print(f'fin {possible_path}')
     return possible_path
@@ -117,30 +139,33 @@ def run_map(play_map, dir_map, sector_map, init_fork_map) :
 def run_path(tile, play_map, sector_map, dir_map, fork_map) :
    # define dir_ and sector when necessary
     cursor = initial_cursor(dir_map, fork_map, tile)
-    controller = {'blocking' : False,  'end_path' : False}
+    controller = {'blocking' : False,  'end_path' : False, 'stop' : False}
     possible_path = 0 # possible path for this tile
+    
+    # cursor fait trois passage au lieu de 2 cf debug
     
     while True :
         
-        "A : embranchement : oui / non , quel cursor "
+        "A : embranchement : "
         if fork_map['fork'].get(cursor['idx']) != None : 
             cursor['fork'] = cursor['idx']
+            controller['stop'] = stop(fork_map)
         "B : obstacle : " 
         controller['blocking'] = blocking(cursor, play_map, sector_map)
         "C : bout de path : " 
         controller['end_path'] = True if cursor['idx'] == len(dir_map) - 1 else False
 
-        debug_1(controller, cursor, fork_map, tile) # DEBUG MOD
-        " On se bagarre avec les variable et le deboggeur : Regarder le deboggeur pour la suite"
+        debug_1(controller, cursor, fork_map, tile) # DEBUG MOD, cmd = 'fork_map'
         
         if fork_map['fork'].get(cursor['idx']) != None :
             fork_map = update_fork_map(cursor['fork'], fork_map)
-            
-        if cursor['fork'] != '' :
+           
+        if controller['end_path'] == True and controller['blocking'] == False : possible_path += 1
+        
+        if controller['stop'] == False :
             if controller['blocking'] == True or controller['end_path'] == True :
                 cursor = initial_cursor(dir_map, fork_map, tile)
-            if controller['blocking'] == True : pass
-            if controller['end_path'] == True : possible_path += 1
+                continue
         else :
             if controller['end_path'] == True : possible_path += 1
             if controller['blocking'] == True or controller['end_path'] == True :
