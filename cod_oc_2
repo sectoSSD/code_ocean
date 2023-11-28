@@ -5,7 +5,8 @@ def debug_run_map(possible_path, play_map) :
     for x in range(play_map['size']):
         line = []
         for y in range(play_map['size']):
-            line.append(possible_path[x,y])
+            try : line.append(possible_path[x,y])
+            except KeyError : line.append('x')
         print(*line, sep=' ')
     
 
