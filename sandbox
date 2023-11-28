@@ -76,10 +76,10 @@ def initial_cursor(dir_map, fork_map, tile) :
 
 def update_cursor (cursor, dir_map, fork_map) :
     cursor['idx'] += 1
-    if fork_map['fork'].get(cursor['idx']) != None :
-        #                 index in dir_map           branch in dir_map 
-        cursor['dir'] = dir_map[cursor['idx']] [fork_map['fork'][cursor['idx']]-1]
-    else : cursor['dir'] = dir_map[ cursor['idx'] ] [0]
+    branch_index = ( fork_map['fork'][cursor['idx']] 
+                            if fork_map['fork'].get(cursor['idx']) != None
+                                                                            else 0 )
+    cursor['dir'] = dir_map[ cursor['idx'] ] [branch_index]
     cursor['tile'] = add(cursor['dir'], cursor['tile'])
     return cursor
 
@@ -187,12 +187,9 @@ def main():
     brows = [(x,y) for x in range(size) for y in range(size) if (x,y) not in island]
     play_map = {'island' : island, 'size' : size, 'brows' : brows}
     sector_map = {} # { cursor : sector }
-    dir_map = [ [(0,1)], [(0,1)], [(0,1)], [(0,1)], [(0,1)], [(0,1)], [(0,1)], [(0,1)],
-                [(0,1)], [(0,1)], [(0,1)], [(0,1), (0,2), (0,3),(0,4)]]
-    """
-    #[[(0,1)], [(1,0)], [(0,-1)], [(1,0)], [(0,1)], [(0,1)], [(-1,0)], [(-1,0)],
+    dir_map =  [[(0,1)], [(1,0)], [(0,-1)], [(1,0)], [(0,1)], [(0,1)], [(-1,0)], [(-1,0)],
                [(0,1)], [(1,0)], [(1,0)], [(1,0)], [(0,-1)], [(0,-1)], [(0,-1)]]
-    """
+
     init_fork_map = config_fork_map(dir_map) # map of embranchement
     print(f"play_map : {play_map['island']}")
     print(f'dir_map : {dir_map}')
