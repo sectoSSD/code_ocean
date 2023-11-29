@@ -71,15 +71,19 @@ def initial_cursor(dir_map, fork_map, tile) :
     # 'fork' : least embranchement '' if no fork
     # 'tile' : current tile on map
     init_cursor = {'dir' : (), 'idx' : 0, 'tile' : tile }
-    if fork_map['fork'].get(0) != None : init_cursor['dir'] = dir_map[0][fork_map['fork'][0]-1]
-    else : init_cursor['dir'] = dir_map[0][0]
+    
+    init_cursor['dir'] = ( dir_map[0][fork_map['fork'][0]-1] 
+                          if fork_map['fork'].get(0) != None
+                          else dir_map[0][0])
     return init_cursor
 
 def update_cursor (cursor, dir_map, fork_map) :
     cursor['idx'] += 1
     branch_index = ( fork_map['fork'][cursor['idx']] 
+                    
                             if fork_map['fork'].get(cursor['idx']) != None
-                                                                            else 0 )
+                            else 0 )
+    
     cursor['dir'] = dir_map[ cursor['idx'] ] [branch_index]
     cursor['tile'] = add(cursor['dir'], cursor['tile'])
     return cursor
@@ -120,12 +124,14 @@ def update_fork_map(fork, fork_map):
 # run_path : controller
 
 def blocking(cursor, play_map, sector_map):
-    # block when out of the game map or when on island
-    blocking = False
-    if (    cursor['tile'] in play_map['island']
-         or sector_map.get(cursor['idx']) == sector(cursor['tile'])
-         or off_side(cursor['tile'], play_map['size']) 
-        ): blocking = True
+    blocking = ( True 
+                        if cursor['tile'] in play_map['island'] 
+                        or off_side(cursor['tile'], play_map['size']) 
+                        or (
+                                sector_map.get(cursor['idx']) != None 
+                                and sector_map.get(cursor['idx']) != sector(cursor['tile'])
+                            )
+                        else False )
     return blocking
 
 def stop(fork_map) :
@@ -184,12 +190,12 @@ def run_path(tile, play_map, sector_map, dir_map, fork_map) :
 def main():
 
     size = 15
-    island = []
+    island = [(1,12),(1,13)]
     brows = [(x,y) for x in range(size) for y in range(size) if (x,y) not in island]
     play_map = {'island' : island, 'size' : size, 'brows' : brows}
-    sector_map = {} # { cursor : sector }
-    dir_map =  [[(0,1)], [(1,0)], [(0,-1)], [(1,0)], [(0,1)], [(0,1)], [(-1,0)], [(-1,0)],
-               [(0,1)], [(1,0)], [(1,0)], [(1,0)], [(0,-1)], [(0,-1)], [(0,-1)]]
+    sector_map = {0:3} # { cursor : sector }
+    dir_map =  [[(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)],
+                [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)],[(1,0)]]
 
     init_fork_map = config_fork_map(dir_map) # map of embranchement
     print(f"play_map : {play_map['island']}")
