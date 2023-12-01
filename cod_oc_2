@@ -40,6 +40,7 @@ def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
         else : pass
 
 # tools
+from itertools import combinations_with_replacement
 from time import perf_counter
 import copy
 
@@ -61,6 +62,26 @@ def sector (xy) :
     for i in '123456789' : # 0 must be least
         if sector[i][0] <= xy[0] < sector[i][1] and sector[i][2] <= xy[1] < sector[i][3] : 
             return int(i)
+
+# start_tile
+
+def test_paths(size, lenght_path) :
+    direction = [(1,0),(-1,0),(0,1),(0,-1)]
+    all_paths = list(combinations_with_replacement(direction, lenght_path))
+    print(len(all_paths))
+    test_path = []
+    for i in range(len(all_paths)) :
+        n_s, e_w = tuple(map(sum, zip( *all_paths[i])))
+        if (n_s or e_w) >= size : continue
+        cursor = (size, size)
+        path = [cursor,]
+        for j in range(size) :
+            cursor = add_tuple(cursor, all_paths[i][j])
+            if cursor not in path : path.append(cursor)
+            else : break
+        if len(path) == lenght_path : test_path.append(all_paths[i])
+    print(len(test_path))
+    return test_path
 
 # run path : cursor
 
@@ -199,17 +220,20 @@ def run_path(tile, play_map, sector_map, dir_map, fork_map) :
         
         cursor = update_cursor(cursor, dir_map, fork_map)
 
-def start_tile(possible_path) :
-    # choose tile where there is most possible path and chose the middle
-    max_value = max(list(possible_path.value()))
-    best_tiles = [tile for tile in possible_path if possible_path[tile] == max_value]
-    distance_with_the_middle = list(map(lambda xy : abs(xy[0]-7) + abs(xy[1]-7), best_tiles ))
-    # reflechir au concept de millieu
+def start_tile(play_map, sector_map, size, start_laps) : 
+    test_path = test_paths(size, start_laps)
+    # le bords sont favorisé pour le départ car plus intérêssant d'être au milieu au bout de 5-6 tours ???
+    test_start_tile = {(i,j) : max(abs(i-7),abs(j-7)) for i in range(size) for j in range(size)}
+    for dir_map in test_path :
+        temp_map = run_map(play_map, sector_map, dir_map)
+        test_start_tile = {key : test_start_tile[key] + temp_map[key] for key in list(test_start_tile.keys())}
+        # suppose qu'il y ai des int à chaque case
     
 def main():
     start_time = perf_counter()
     size = 15
     island = [(1,12),(1,13)]
+    start_laps = 16
     brows = [(x,y) for x in range(size) for y in range(size) if (x,y) not in island]
     play_map = {'island' : island, 'size' : size, 'brows' : brows}
     sector_map = {} # { cursor : sector }
@@ -219,6 +243,9 @@ def main():
     init_fork_map = config_fork_map(dir_map) # map of embranchement
     print(f"play_map : {play_map['island']}")
     print(f'dir_map : {dir_map}')
+    
+    start_tile(play_map, sector_map, size, start_laps)
+    
     run_map(play_map, dir_map, sector_map, init_fork_map)
     print(f' time : {perf_counter() - start_time}')
 
