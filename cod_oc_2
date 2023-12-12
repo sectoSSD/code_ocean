@@ -7,7 +7,7 @@ def debug_run_map(possible_path, play_map) :
         for y in range(play_map['size']):
             try : line.append(possible_path[x,y])
             except KeyError : 
-                line.append('x') if (x,y) in play_map['island'] else line.append('_')
+                line.append(0) if (x,y) in play_map['island'] else line.append(0) # only digit
         print(*line, sep=' ')
     
 
@@ -79,7 +79,7 @@ def test_paths(size, lenght_path) :
             cursor = add_tuple(cursor, all_paths[i][j])
             if cursor not in path : path.append(cursor)
             else : break
-        if len(path) == lenght_path : test_path.append(all_paths[i])
+        if len(path) == lenght_path : test_path.append(config_dir_map(all_paths[i]))
     print(len(test_path))
     return test_path
 
@@ -173,7 +173,7 @@ def stop(fork_map) :
 
 ###
 
-def run_map(play_map, dir_map, sector_map, init_fork_map) : 
+def run_map(play_map, dir_map, sector_map = {}, init_fork_map = {'fork' : '???') : 
     # integrer dans un run map un filtre ('max_NS','max_EW')
     possible_path = {}
     for tile in play_map['brows'] :
@@ -220,14 +220,17 @@ def run_path(tile, play_map, sector_map, dir_map, fork_map) :
         
         cursor = update_cursor(cursor, dir_map, fork_map)
 
-def start_tile(play_map, sector_map, size, start_laps) : 
+def start_tile(play_map, size, start_laps) :
     test_path = test_paths(size, start_laps)
     # le bords sont favorisé pour le départ car plus intérêssant d'être au milieu au bout de 5-6 tours ???
     test_start_tile = {(i,j) : max(abs(i-7),abs(j-7)) for i in range(size) for j in range(size)}
     for dir_map in test_path :
-        temp_map = run_map(play_map, sector_map, dir_map)
+        print(f'dir_map {dir_map}')
+        temp_map = run_map(play_map, dir_map)
         test_start_tile = {key : test_start_tile[key] + temp_map[key] for key in list(test_start_tile.keys())}
-        # suppose qu'il y ai des int à chaque case
+    print(test_start_tile)
+    # problème dans dir_map['fork'] : tous les index sont inscrit alors qu'il ne devrait pas en avoir
+    # problème de valeur defaut pour init fork_map : pas le bon format
     
 def main():
     start_time = perf_counter()
@@ -236,6 +239,10 @@ def main():
     start_laps = 16
     brows = [(x,y) for x in range(size) for y in range(size) if (x,y) not in island]
     play_map = {'island' : island, 'size' : size, 'brows' : brows}
+    
+    start_tile(play_map, size, start_laps)
+    
+    """
     sector_map = {} # { cursor : sector }
     dir_ =  [[(0,1)], [(0,1)], [(0,1)], [(0,1)], [(0,1)], [(0,1)], [(0,1)], [(0,1)],
              [(0,1)], [(0,1)], [(0,1)], [(0,1)], [(0,1)], [(0,1)], [(0,1)]]
@@ -244,9 +251,9 @@ def main():
     print(f"play_map : {play_map['island']}")
     print(f'dir_map : {dir_map}')
     
-    start_tile(play_map, sector_map, size, start_laps)
-    
     run_map(play_map, dir_map, sector_map, init_fork_map)
+    """
+    
     print(f' time : {perf_counter() - start_time}')
 
 if __name__ == '__main__' : main()
