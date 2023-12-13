@@ -1,13 +1,13 @@
 
 # debug
 
-def debug_run_map(possible_path, play_map) :
+def show_map(content, play_map) :
+    # give graphics overview of the value of each tiles, content is a dic with tuple (x,y) as key
     for x in range(play_map['size']):
         line = []
         for y in range(play_map['size']):
-            try : line.append(possible_path[x,y])
-            except KeyError : 
-                line.append(0) if (x,y) in play_map['island'] else line.append(0) # only digit
+            try : line.append(f'{content[x,y]:02}')
+            except KeyError : line.append('00')
         print(*line, sep=' ')
     
 
@@ -49,11 +49,16 @@ def add_tuple (tuple_1, tuple_2) :
 
 # run path : map
 
-def off_side (tile, size) :
-    off_side = False
-    for xy in tile :
-        if not  0 <= xy < size : off_side = True
-    return off_side
+
+def off_side_tile (tile, size) :
+    x,y = tile
+    return (x or y) not in range(0,size)
+
+
+def off_side_path(path, size) :
+    n_s = abs(sum([i[0][0] for i in path]))
+    e_w = abs(sum([i[0][1] for i in path]))
+    return (n_s or e_w) >= size
 
 def sector (xy) :
     sector = {'1': [ 0, 5, 0, 5], '2' : [ 0, 5, 5,10], '3' : [ 0, 5,10,15],
@@ -66,20 +71,19 @@ def sector (xy) :
 # start_tile
 
 def test_paths(size, lenght_path) :
-    direction = [(1,0),(-1,0),(0,1),(0,-1)]
+    direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
     all_paths = list(combinations_with_replacement(direction, lenght_path))
     print(len(all_paths))
     test_path = []
     for i in range(len(all_paths)) :
-        n_s, e_w = tuple(map(sum, zip( *all_paths[i])))
-        if (n_s or e_w) >= size : continue
+        if off_side_path(all_paths[i], size) : continue
         cursor = (size, size)
         path = [cursor,]
         for j in range(size) :
-            cursor = add_tuple(cursor, all_paths[i][j])
+            cursor = add_tuple(cursor, all_paths[i][j][0])
             if cursor not in path : path.append(cursor)
             else : break
-        if len(path) == lenght_path : test_path.append(config_dir_map(all_paths[i]))
+        if len(path) == lenght_path : test_path.append(config_dir_map(list(all_paths[i])))
     print(len(test_path))
     return test_path
 
@@ -155,7 +159,7 @@ def update_fork_map(fork, fork_map):
 def blocking(cursor, play_map, sector_map):
     blocking = ( True 
                         if cursor['tile'] in play_map['island'] 
-                        or off_side(cursor['tile'], play_map['size']) 
+                        or off_side_tile(cursor['tile'], play_map['size']) 
                         or (
                                 sector_map.get(cursor['idx']) != None 
                                 and sector_map.get(cursor['idx']) != sector(cursor['tile'])
@@ -173,18 +177,18 @@ def stop(fork_map) :
 
 ###
 
-def run_map(play_map, dir_map, sector_map = {}, init_fork_map = {'fork' : '???') : 
+def run_map(play_map, dir_map, sector_map ={}, init_fork_map ={'fork':{}}, command ='gameloop') :
     # integrer dans un run map un filtre ('max_NS','max_EW')
     possible_path = {}
     for tile in play_map['brows'] :
         
         #if (tile[0] + dir_map['max'][0] or tile[1] + dir_map['max'][1] ) > play_map['size'] : continue
-        if off_side(add_tuple(tile, dir_map['max']), play_map['size'] + 1) : continue
+        if off_side_tile(add_tuple(tile, dir_map['max']), play_map['size'] + 1) : continue
     
         fork_map = copy.deepcopy(init_fork_map)
         possible_path[tile] = run_path(tile, play_map, sector_map, dir_map, fork_map)
             
-    debug_run_map(possible_path, play_map)
+    if command == 'gameloop' : show_map(possible_path, play_map)
     return possible_path
 
 def run_path(tile, play_map, sector_map, dir_map, fork_map) :
@@ -226,16 +230,18 @@ def start_tile(play_map, size, start_laps) :
     test_start_tile = {(i,j) : max(abs(i-7),abs(j-7)) for i in range(size) for j in range(size)}
     for dir_map in test_path :
         print(f'dir_map {dir_map}')
-        temp_map = run_map(play_map, dir_map)
-        test_start_tile = {key : test_start_tile[key] + temp_map[key] for key in list(test_start_tile.keys())}
-    print(test_start_tile)
+        temp_map = run_map(play_map, dir_map, command = 'start_tile')
+        for key in list(test_start_tile.keys()) :
+            try : test_start_tile[key] += temp_map[key]
+            except KeyError : pass
+    print(show_map(test_start_tile, play_map))
     # problème dans dir_map['fork'] : tous les index sont inscrit alors qu'il ne devrait pas en avoir
     # problème de valeur defaut pour init fork_map : pas le bon format
     
 def main():
     start_time = perf_counter()
     size = 15
-    island = [(1,12),(1,13)]
+    island = []
     start_laps = 16
     brows = [(x,y) for x in range(size) for y in range(size) if (x,y) not in island]
     play_map = {'island' : island, 'size' : size, 'brows' : brows}
@@ -253,7 +259,7 @@ def main():
     
     run_map(play_map, dir_map, sector_map, init_fork_map)
     """
-    
+  
     print(f' time : {perf_counter() - start_time}')
 
 if __name__ == '__main__' : main()
