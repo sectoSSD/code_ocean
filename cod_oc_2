@@ -7,9 +7,8 @@ def show_map(content, play_map) :
         line = []
         for y in range(play_map['size']):
             try : line.append(f'{content[x,y]:02}')
-            except KeyError : line.append('00')
-        print(*line, sep=' ')
-    
+            except KeyError : line.append('XX')
+        print(*line, sep=' ')   
 
 def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
         """ position in debug line:
@@ -40,7 +39,7 @@ def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
         else : pass
 
 # tools
-from itertools import combinations_with_replacement
+from itertools import product
 from time import perf_counter
 import copy
 
@@ -70,22 +69,46 @@ def sector (xy) :
 
 # start_tile
 
+"""
 def test_paths(size, lenght_path) :
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
-    all_paths = list(combinations_with_replacement(direction, lenght_path))
-    # print(len(all_paths))
     test_path = []
-    for i in range(len(all_paths)) :
-        if off_side_path(all_paths[i], size, command = 'do yourself') : continue
+    
+    for current_path in product(direction, repeat=lenght_path) :
+        if off_side_path(current_path, size, command = 'do yourself') : continue
         cursor = (size, size)
-        path = [cursor,]
+        path = [cursor]
         for j in range(lenght_path) :
-            cursor = add_tuple(cursor, all_paths[i][j][0])
+            cursor = add_tuple(cursor, current_path[j][0])
             if cursor not in path : path.append(cursor)
             else : break
-        if len(path) == lenght_path : test_path.append(config_dir_map(list(all_paths[i])))
+        if len(path) == lenght_path : test_path.append( 
+                                                        config_dir_map(list(current_path))
+                                                                                            )
     # print(len(test_path))
     return test_path
+"""
+
+def random_path(lenght,size) :
+    direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
+    while True :
+        current_direction_path = []
+        current_tile = (size,size)
+        current_tile_path = [current_tile]
+        counter = 0
+        while True :
+            current_direction = random.choice(direction)
+            current_tile = add_tuple(current_tile,current_direction[0])
+            if current_tile not in current_tile_path and off_side_path(
+                                                current_direction_path, size, command = 'do yourslef') == False :
+                current_tile_path.append(current_tile)
+                current_direction_path.append(current_direction)
+                if len(current_direction_path) == lenght : return current_direction_path
+                counter = 0
+            else :
+                counter += 1
+                if counter <= 6 : continue
+                else : break
 
 # run path : cursor
 
@@ -183,8 +206,7 @@ def run_map(play_map, dir_map, sector_map ={}, init_fork_map ={'fork':{}}, comma
     for tile in play_map['brows'] :
         if off_side_path(dir_map, play_map['size']) : continue
         fork_map = copy.deepcopy(init_fork_map)
-        possible_path[tile] = run_path(tile, play_map, sector_map, dir_map, fork_map)
-            
+        possible_path[tile] = run_path(tile, play_map, sector_map, dir_map, fork_map)     
     if command == 'gameloop' : show_map(possible_path, play_map)
     return possible_path
 
@@ -222,20 +244,22 @@ def run_path(tile, play_map, sector_map, dir_map, fork_map) :
 def start_tile(play_map, start_laps) :
     test_path = test_paths(play_map['size'], start_laps)
     # le bords sont favorisé pour le départ car plus intérêssant d'être au milieu au bout de 5-6 tours ???
-    test_start_tile = {(i,j) : max(abs(i-7),abs(j-7)) for i in range(play_map['size']) for j in range(play_map['size'])}
+    #test_start_tile = {(i,j) : max(abs(i-7),abs(j-7)) for i in range(play_map['size']) for j in range(play_map['size'])}
+    test_start_tile = {(i,j) : 0 for i in range(play_map['size']) for j in range(play_map['size'])}
     for dir_map in test_path :
         print(f'dir_map {dir_map}')
         temp_map = run_map(play_map, dir_map, command = 'start_tile')
         for key in list(test_start_tile.keys()) :
-            try : test_start_tile[key] += temp_map[key]
-            except KeyError : pass
+            #try : test_start_tile[key] += temp_map[key]
+            #except KeyError : pass
+            test_start_tile[key] += temp_map[key]
     print(show_map(test_start_tile, play_map))
 
 def main():
     start_time = perf_counter()
     size = 15
     island = []
-    start_laps = 16
+    start_laps = 10 # == lenght_path
     brows = [(x,y) for x in range(size) for y in range(size) if (x,y) not in island]
     play_map = {'island' : island, 'size' : size, 'brows' : brows}
     
