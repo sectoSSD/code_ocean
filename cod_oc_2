@@ -1,4 +1,5 @@
 
+
 # debug
 
 def show_map(content, play_map) :
@@ -37,6 +38,19 @@ def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
         if 'controller' in cmd : r += (' ' + str(controller))* show[0]
         if r : print(r)
         else : pass
+
+# play_map
+
+def config_play_map() :
+    width, height, my_id = [int(i) for i in input().split()]
+    size = width if width == height else 'problem'
+    island, brows = [], []
+    for y in range(size):
+        line = input()
+        for x in range(size) :
+            if line[x] == 'x' : island.append(x,y)
+            else : brows.append(x,y)
+    return {'island' : island, 'size' : size, 'brows' : brows}
 
 # tools
 from random import choice
@@ -241,12 +255,8 @@ def start_tile(play_map, start_laps) :
             if try_ % (play_map['size']**2) == 0 : idx += 1
 
 def main():
-    start_time = perf_counter()
-    size = 15
-    island = [(7,7),(7,8),(8,7),(8,8)]
     start_laps = 16 # == lenght_path
-    brows = [(x,y) for x in range(size) for y in range(size) if (x,y) not in island]
-    play_map = {'island' : island, 'size' : size, 'brows' : brows}
+    play_map = config_play_map()
     
     print(start_tile(play_map, start_laps))
     
@@ -266,3 +276,19 @@ def main():
     print(f' time : {perf_counter() - start_time}')
 
 if __name__ == '__main__' : main()
+
+# Write an action using print
+# To debug: print("Debug messages...", file=sys.stderr, flush=True)
+
+print("7 7")
+
+# game loop
+while True:
+    x, y, my_life, opp_life, torpedo_cooldown, sonar_cooldown, silence_cooldown, mine_cooldown = [int(i) for i in input().split()]
+    sonar_result = input()
+    opponent_orders = input()
+
+    # Write an action using print
+    # To debug: print("Debug messages...", file=sys.stderr, flush=True)
+
+    print("MOVE N TORPEDO")
