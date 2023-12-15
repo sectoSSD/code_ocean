@@ -1,0 +1,268 @@
+
+# debug
+
+def show_map(content, play_map) :
+    # give graphics overview of the value of each tiles, content is a dic with tuple (x,y) as key
+    for x in range(play_map['size']):
+        line = []
+        for y in range(play_map['size']):
+            try : line.append(f'{content[x,y]:02}')
+            except KeyError : line.append('XX')
+        print(*line, sep=' ')   
+
+def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
+        """ position in debug line:
+        1           tile                      -> tile from which dir_ starts to browse 
+        2           cursor['idx']             -> index in dir_
+        3           block/end_path            -> when blocking or end_path is true
+        4 fork_map['fork']/fork_map['max']    -> main information on the situation in fork_map
+        '_' if nothing
+        OPTION : if cmd = 'cursor','fork_map', 'controller' print one or several contain
+        """
+        show = (max([controller['blocking'], controller['end_path']]),
+                controller['blocking'],
+                controller['end_path']) 
+        fork_map_situation = [str(fork) + '/' + str(max_)
+                              for fork in list(fork_map['fork'].values())
+                              for max_ in list(fork_map['max'].values()) ]
+        space = ' ' * 25 if tile[1] % 2 != 0 else '' # just to see more tile changing
+        r += (space + str(tile)) * show[0]
+        r += (' ' + str(cursor['idx'])) * show[0]
+        r += (' ' + ('block')) * show[1]
+        r += (' ' + ('end_path')) * show[2]
+        r += (' ' + str(*fork_map_situation if fork_map_situation else '_'))* show[0]
+        r += (' ' + str(controller['stop'])) * show[0]
+        if  'fork_map' in cmd : r += (' ' + str(fork_map)) * show[0]
+        if 'cursor' in cmd : r += (' ' + str(cursor)) * show[0]
+        if 'controller' in cmd : r += (' ' + str(controller))* show[0]
+        if r : print(r)
+        else : pass
+
+# tools
+from random import choice
+from time import perf_counter
+import copy
+
+def add_tuple (tuple_1, tuple_2) :
+    return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
+
+# run path : map
+
+def off_side_tile (tile, size) :
+    x,y = tile
+    return (x not in range(0,size) or y not in range(0,size))
+
+def off_side_path(path, size, command = 'done') :
+    if command == 'done' : n_s, e_w = path['max']
+    else :
+        n_s = abs( sum([xy[0][0] for xy in path]) )
+        e_w = abs( sum([xy[0][1] for xy in path]) )
+    return (n_s > size or e_w > size)
+
+def sector (xy) :
+    sector = {'1': [ 0, 5, 0, 5], '2' : [ 0, 5, 5,10], '3' : [ 0, 5,10,15],
+              '4': [ 5,10, 0, 5], '5' : [ 5,10, 5,10], '6' : [ 5,10,10,15],
+              '7': [10,15, 0, 5], '8' : [10,15, 5,10], '9' : [10,15,10,15]}
+    for i in '123456789' : # 0 must be least
+        if sector[i][0] <= xy[0] < sector[i][1] and sector[i][2] <= xy[1] < sector[i][3] : 
+            return int(i)
+
+# start_tile
+
+def random_path(lenght,size) :
+    direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
+    while True :
+        current_direction_path = []
+        current_tile = (size,size)
+        current_tile_path = [current_tile]
+        counter = 0
+        while True :
+            current_direction = choice(direction)
+            temp_tile = add_tuple(current_tile,current_direction[0])
+            if ( temp_tile not in current_tile_path 
+                 and off_side_path(current_direction_path, size, command = 'do yourslef') == False ):
+                current_tile = temp_tile
+                current_tile_path.append(current_tile)
+                current_direction_path.append(current_direction)
+                if len(current_direction_path) == lenght : 
+                    return config_dir_map(current_direction_path)
+                counter = 0
+            else :
+                temp_tile = current_tile
+                counter += 1
+                if counter <= 6 : continue
+                else : break
+
+# run path : cursor
+
+def initial_cursor(dir_map, fork_map, tile) :
+    # 'dir' : current position in dir_map
+    # 'idx' : current index in dir_map
+    # 'fork' : least embranchement '' if no fork
+    # 'tile' : current tile on map
+    init_cursor = {'dir' : (), 'idx' : 0, 'tile' : tile }
+    
+    init_cursor['dir'] = ( dir_map['dir'][0][fork_map['fork'][0]-1] 
+                          if fork_map['fork'].get(0) != None
+                          else dir_map['dir'][0][0])
+    return init_cursor
+
+def update_cursor (cursor, dir_map, fork_map) :
+    cursor['idx'] += 1
+    branch_index = ( fork_map['fork'][cursor['idx']] 
+                    
+                            if fork_map['fork'].get(cursor['idx']) != None
+                            else 0 )
+    
+    cursor['dir'] = dir_map['dir'][ cursor['idx'] ] [branch_index]
+    cursor['tile'] = add_tuple(cursor['dir'], cursor['tile'])
+    return cursor
+# run_path : dir_map
+
+def config_dir_map(dir_) :
+    dir_map = {'dir' : dir_ , 
+               'max' :  ( abs( sum([xy[0][0] for xy in dir_ if len(xy) == 1]) ),
+                          abs( sum([xy[0][1] for xy in dir_ if len(xy) == 1]) )), 
+               'length' : len(dir_),
+               'fork' :   [idx for idx in range(len(dir_)) if len(dir_[idx]) != 1],
+               }
+    return dir_map
+
+# run_path : fork_map
+            
+def config_fork_map (dir_map) :
+    # how fork_map is built :
+    fork_map = {'fork' : {}, 'max' : {}, 'fork-index': {}, 'index-fork' : {}}
+    index = 0
+    for fork in dir_map['fork'] :
+        fork_map['fork'][fork] = 0
+        fork_map['max'][fork] = len(dir_map['dir'][fork])
+        fork_map['fork-index'][fork] = index
+        fork_map['index-fork'][index] = fork
+        index += 1
+    return fork_map
+
+def del_fork_map (fork_map, fork) :
+    index = fork_map['fork-index'][fork] 
+    for cursor in ['fork', 'max', 'fork-index'] : del fork_map[cursor][fork]
+    del fork_map['index-fork'][index]
+    return fork_map
+
+def update_fork_map(fork, fork_map): 
+    fork_map['fork'][fork] += 1
+    while fork_map['fork'][fork] > fork_map['max'][fork] :
+        index = fork_map['fork-index'][fork]
+        index -= 1 if index - 1 >= 0 else 0
+        fork_map = del_fork_map(fork_map, fork)
+        try :
+            fork = fork_map['index-fork'][index]
+            fork_map['fork'][fork] += 1    
+        except KeyError : break
+    return fork_map
+
+# run_path : controller
+
+def blocking(cursor, play_map, sector_map):
+    blocking = ( True 
+                        if cursor['tile'] in play_map['island'] 
+                        or off_side_tile(cursor['tile'], play_map['size']) 
+                        or (
+                                sector_map.get(cursor['idx']) != None 
+                                and sector_map.get(cursor['idx']) != sector(cursor['tile'])
+                            )
+                        else False )
+    return blocking
+
+def stop(fork_map) :
+    if len(fork_map['fork'].keys()) != len(fork_map['max'].keys()) : 
+        raise ValueError('fork_map')
+    if (len(fork_map['fork'].keys()) == 1 and 
+        list(fork_map['fork'].values()) == list(fork_map['max'].values())) :
+        return True
+    else : return False
+
+###
+
+def run_map(play_map, dir_map, sector_map ={}, init_fork_map ={'fork':{}}, command ='gameloop') :
+    # integrer dans un run map un filtre ('max_NS','max_EW')
+    possible_path = {}
+    for tile in play_map['brows'] :
+        if off_side_path(dir_map, play_map['size']) : continue
+        fork_map = copy.deepcopy(init_fork_map)
+        possible_path[tile] = run_path(tile, play_map, sector_map, dir_map, fork_map)     
+    if command == 'gameloop' : show_map(possible_path, play_map)
+    return possible_path
+
+def run_path(tile, play_map, sector_map, dir_map, fork_map) :
+   # define dir_ and sector when necessary
+    cursor = initial_cursor(dir_map, fork_map, tile)
+    controller = {'blocking' : False,  'end_path' : False, 'stop' : True}
+    possible_path = 0 # possible path for this tile
+    
+    while True :
+        
+        "A : embranchement : "
+        if fork_map['fork'].get(cursor['idx']) != None :
+            fork_map = update_fork_map(cursor['idx'], fork_map)
+            controller['stop'] = stop(fork_map)
+        "B : obstacle : " 
+        controller['blocking'] = blocking(cursor, play_map, sector_map)
+        "C : bout de path : " 
+        controller['end_path'] = True if cursor['idx'] == dir_map['length'] - 1 else False
+
+        debug_run_path(controller, cursor, fork_map, tile) # DEBUG MOD
+            
+        if controller['end_path'] == True and controller['blocking'] == False : possible_path += 1
+        
+        if controller['stop'] == False :
+            if controller['blocking'] == True or controller['end_path'] == True :
+                cursor = initial_cursor(dir_map, fork_map, tile)
+                continue
+        else :
+            if controller['blocking'] == True or controller['end_path'] == True :
+                return possible_path
+        
+        cursor = update_cursor(cursor, dir_map, fork_map)
+
+def start_tile(play_map, start_laps) :
+    nb_tile = [25,16,9,4,1]
+    idx = 0
+    try_ = 0
+    while True :
+        random_dir_map = random_path(start_laps,play_map['size'])
+        possible_path = run_map( play_map,
+                                 dir_map = random_dir_map,
+                                 command = 'start tile')
+        if sum(possible_path.values()) > nb_tile[idx] :
+            return ( choice( list(possible_path.keys()) ),
+                     random_dir_map )
+        else : 
+            try_ += 1
+            if try_ % (play_map['size']**2) == 0 : idx += 1
+
+def main():
+    start_time = perf_counter()
+    size = 15
+    island = [(7,7),(7,8),(8,7),(8,8)]
+    start_laps = 16 # == lenght_path
+    brows = [(x,y) for x in range(size) for y in range(size) if (x,y) not in island]
+    play_map = {'island' : island, 'size' : size, 'brows' : brows}
+    
+    print(start_tile(play_map, start_laps))
+    
+    
+    """
+    sector_map = {} # { cursor : sector }
+    dir_ =  [[(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)],
+             [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)]]
+    dir_map = config_dir_map(dir_)
+    init_fork_map = config_fork_map(dir_map) # map of embranchement
+    print(f"play_map : {play_map['island']}")
+    print(f'dir_map : {dir_map}')
+    
+    run_map(play_map, dir_map, sector_map, init_fork_map)
+    """
+  
+    print(f' time : {perf_counter() - start_time}')
+
+if __name__ == '__main__' : main()
