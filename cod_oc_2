@@ -1,4 +1,4 @@
-### config_sector_map !
+# manage_order, blocking, update_dir_map, dir_map['sector] ...
 
 # debug
 
@@ -39,6 +39,14 @@ def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
         if r : print(r)
         else : pass
 
+# tools
+from random import choice
+from time import perf_counter
+import copy
+
+def add_tuple (tuple_1, tuple_2) :
+    return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
+
 # play_map
 
 def config_play_map() :
@@ -51,14 +59,6 @@ def config_play_map() :
             if line[x] == 'x' : island.append((x,y))
             else : brows.append((x,y))
     return {'island' : island, 'size' : size, 'brows' : brows}
-
-# tools
-from random import choice
-from time import perf_counter
-import copy
-
-def add_tuple (tuple_1, tuple_2) :
-    return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
 
 # run path : map
 
@@ -116,16 +116,44 @@ def random_path(lenght,size) :
                 if counter <= 6 : continue
                 else : break
 
-# game_loop 
+# game_loop : orders
 
-def manage_order(my_position, index, order, dir_map, sector_map) :
+def torpedo_area(x,y, play_map) :
+    ref_position = (x,y)
+    current_position = ref_position
+    direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
+    torpedo_area = []
+    torpedo_range = 4
+    range_, try_, max_try = 0, 0, torpedo_range**6
+    while True :
+        try_ += 1
+        range_ += 1
+        current_direction = choice(direction)
+        current_position = add_tuple(current_position,current_direction[0])
+        if blocking(current_position, play_map) :
+            current_position = ref_position
+            range_ = 0
+            continue
+        if current_position not in torpedo_area and current_position != ref_position :
+            torpedo_area.append(current_position)
+            current_position = ref_position
+            try_ = 0
+            range_ = 0
+        if range_ == torpedo_range : 
+            current_position = ref_position
+            range_ = 0
+        if try_ == max_try or len(torpedo_area) == 40 : return torpedo_area
+
+def manage_order(index, order, dir_map, play_map) :
     message_order = [cursor.split() for cursor in order.split('|')]
     for order_cursor in message_order :
-        if (order_cursor[0] == 'MOVE' or order_cursor[0] == 'MOVE'
+        if (order_cursor[0] == 'MOVE' or order_cursor[0] == 'SILENCE'
            ) : dir_map['dir'].append( dir_converter(order_cursor[1]) )
-        elif (order_cursor[0] == 'TORPEDO' or order_cursor[0] == 'SURFACE' or order_cursor[0] == 'SONAR'
-           ) : sector_map = 'config_sector_map(my_position, order_cursor[1], sector_map)'
-    return dir_map, sector_map
+        elif (order_cursor[0] == 'SURFACE' or order_cursor[0] == 'SONAR'
+           ) : dir_map['sector']= 'config_sector_map(order_cursor[1], sector_map)'
+        elif order_cursor[0] == 'TORPEDO' :
+            dir_map = dir_map['sector']['tiles'][index] = torpedo_area(order_cursor[1], order_cursor[2], play_map)
+    return dir_map
 
 # run path : cursor
 
@@ -151,6 +179,7 @@ def update_cursor (cursor, dir_map, fork_map) :
     cursor['dir'] = dir_map['dir'][ cursor['idx'] ] [branch_index]
     cursor['tile'] = add_tuple(cursor['dir'], cursor['tile'])
     return cursor
+
 # run_path : dir_map
 
 def config_dir_map(dir_) :
@@ -158,14 +187,12 @@ def config_dir_map(dir_) :
                'max' :  ( abs( sum([xy[0][0] for xy in dir_ if len(xy) == 1]) ),
                           abs( sum([xy[0][1] for xy in dir_ if len(xy) == 1]) )), 
                'length' : len(dir_),
-               'fork' :   [idx for idx in range(len(dir_)) if len(dir_[idx]) != 1],
-               }
+               'fork'   : [idx for idx in range(len(dir_)) if len(dir_[idx]) != 1],
+               'sector' : {'in'  :   {},
+                           'out' :   {},
+                           'tiles' : {}}}
     return dir_map
-    
-# run_path sector_map
 
-def config_sector_map() :
-    return 'to do'
 # run_path : fork_map
             
 def config_fork_map (dir_map) :
@@ -200,7 +227,7 @@ def update_fork_map(fork, fork_map):
 
 # run_path : controller
 
-def blocking(cursor, play_map, sector_map):
+def blocking(cursor, play_map): # revoir : sector_map
     blocking = ( True 
                         if cursor['tile'] in play_map['island'] 
                         or off_side_tile(cursor['tile'], play_map['size']) 
@@ -221,18 +248,17 @@ def stop(fork_map) :
 
 # main engine
 
-def run_map(play_map, dir_map, sector_map ={}, init_fork_map ={'fork':{}}, command ='gameloop') :
+def run_map(play_map, dir_map, init_fork_map ={'fork':{}}, command ='gameloop') :
     # integrer dans un run map un filtre ('max_NS','max_EW')
     possible_path = {}
     for tile in play_map['brows'] :
         if off_side_path(dir_map, play_map['size']) : continue
         fork_map = copy.deepcopy(init_fork_map)
-        possible_path[tile] = run_path(tile, play_map, sector_map, dir_map, fork_map)     
+        possible_path[tile] = run_path(tile, play_map, dir_map, fork_map)     
     if command == 'gameloop' : show_map(possible_path, play_map)
     return possible_path
 
-def run_path(tile, play_map, sector_map, dir_map, fork_map) :
-   # define dir_ and sector when necessary
+def run_path(tile, play_map, dir_map, fork_map) :
     cursor = initial_cursor(dir_map, fork_map, tile)
     controller = {'blocking' : False,  'end_path' : False, 'stop' : True}
     possible_path = 0 # possible path for this tile
@@ -244,7 +270,7 @@ def run_path(tile, play_map, sector_map, dir_map, fork_map) :
             fork_map = update_fork_map(cursor['idx'], fork_map)
             controller['stop'] = stop(fork_map)
         "B : obstacle : " 
-        controller['blocking'] = blocking(cursor, play_map, sector_map)
+        controller['blocking'] = blocking(cursor, play_map, dir_map['sector'])
         "C : bout de path : " 
         controller['end_path'] = True if cursor['idx'] == dir_map['length'] - 1 else False
 
@@ -279,16 +305,18 @@ def start(play_map, start_laps) :
             try_ += 1
             if try_ % (play_map['size']**2) == 0 : idx += 1
 
-def game_loop(start_path) :
-    his_order = {'dir': [], 'sector' : }
+def game_loop(my_dir_map, his_dir_map, play_map) :
+    lap = 0
     while True :
 
         x, y, my_life, opp_life, torpedo_cooldown, sonar_cooldown, silence_cooldown, mine_cooldown = [int(i) for i in input().split()]
+        my_position = (x,y)
         sonar_result = input()
-        his_orders = input()
 
-        direction = dir_converter( start_path['dir'][0][0] )
-        start_path['dir'].pop(0)
+        his_dir_map = manage_order(lap, input(), his_dir_map, play_map)
+
+        direction = dir_converter( my_dir_map['dir'][0][0] )
+        my_dir_map['dir'].pop(0)
         print(f'MOVE {direction} SILENCE')
 
 def main():
@@ -297,11 +325,11 @@ def main():
     start_laps = 16 # == lenght_path
     play_map = config_play_map()
     
-    start_tile, start_path = start(play_map, start_laps)
-    
+    start_tile, my_dir_map = start(play_map, start_laps)
+    his_dir_map = config_dir_map([])
     print(*start_tile)
 
-    game_loop(start_path)
+    game_loop(my_dir_map, his_dir_map, play_map)
 
 
     
