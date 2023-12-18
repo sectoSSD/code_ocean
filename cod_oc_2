@@ -48,8 +48,8 @@ def config_play_map() :
     for y in range(size):
         line = input()
         for x in range(size) :
-            if line[x] == 'x' : island.append(x,y)
-            else : brows.append(x,y)
+            if line[x] == 'x' : island.append((x,y))
+            else : brows.append((x,y))
     return {'island' : island, 'size' : size, 'brows' : brows}
 
 # tools
@@ -80,6 +80,13 @@ def sector (xy) :
     for i in '123456789' : # 0 must be least
         if sector[i][0] <= xy[0] < sector[i][1] and sector[i][2] <= xy[1] < sector[i][3] : 
             return int(i)
+
+def dir_converter(key) :
+    dir_dic = { (-1, 0) : 'N', 'N' : (-1, 0),
+                ( 1, 0) : 'S', 'S' : ( 1, 0),
+                ( 0,-1) : 'E', 'E' : ( 0,-1),
+                ( 0, 1) : 'W', 'W' : ( 0, 1) }
+    return dir_dic[key]
 
 # start_tile
 
@@ -195,7 +202,7 @@ def stop(fork_map) :
         return True
     else : return False
 
-###
+# main engine
 
 def run_map(play_map, dir_map, sector_map ={}, init_fork_map ={'fork':{}}, command ='gameloop') :
     # integrer dans un run map un filtre ('max_NS','max_EW')
@@ -224,7 +231,7 @@ def run_path(tile, play_map, sector_map, dir_map, fork_map) :
         "C : bout de path : " 
         controller['end_path'] = True if cursor['idx'] == dir_map['length'] - 1 else False
 
-        debug_run_path(controller, cursor, fork_map, tile) # DEBUG MOD
+        # debug_run_path(controller, cursor, fork_map, tile) # DEBUG MOD
             
         if controller['end_path'] == True and controller['blocking'] == False : possible_path += 1
         
@@ -238,7 +245,8 @@ def run_path(tile, play_map, sector_map, dir_map, fork_map) :
         
         cursor = update_cursor(cursor, dir_map, fork_map)
 
-def start_tile(play_map, start_laps) :
+# game
+def start(play_map, start_laps) :
     nb_tile = [25,16,9,4,1]
     idx = 0
     try_ = 0
@@ -254,12 +262,30 @@ def start_tile(play_map, start_laps) :
             try_ += 1
             if try_ % (play_map['size']**2) == 0 : idx += 1
 
+def game_loop(start_path) :
+    while True :
+
+        x, y, my_life, opp_life, torpedo_cooldown, sonar_cooldown, silence_cooldown, mine_cooldown = [int(i) for i in input().split()]
+        sonar_result = input()
+        opponent_orders = input()
+
+        direction = dir_converter( start_path['dir'][0][0] )
+        start_path['dir'].pop(0)
+        print(f'MOVE {direction} SILENCE')
+
 def main():
+    start_time = perf_counter()
+
     start_laps = 16 # == lenght_path
     play_map = config_play_map()
     
-    print(start_tile(play_map, start_laps))
+    start_tile, start_path = start(play_map, start_laps)
     
+    print(*start_tile)
+
+    game_loop(start_path)
+
+
     
     """
     sector_map = {} # { cursor : sector }
@@ -276,19 +302,3 @@ def main():
     print(f' time : {perf_counter() - start_time}')
 
 if __name__ == '__main__' : main()
-
-# Write an action using print
-# To debug: print("Debug messages...", file=sys.stderr, flush=True)
-
-print("7 7")
-
-# game loop
-while True:
-    x, y, my_life, opp_life, torpedo_cooldown, sonar_cooldown, silence_cooldown, mine_cooldown = [int(i) for i in input().split()]
-    sonar_result = input()
-    opponent_orders = input()
-
-    # Write an action using print
-    # To debug: print("Debug messages...", file=sys.stderr, flush=True)
-
-    print("MOVE N TORPEDO")
