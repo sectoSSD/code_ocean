@@ -1,4 +1,4 @@
-
+### config_sector_map !
 
 # debug
 
@@ -77,15 +77,17 @@ def sector (xy) :
     sector = {'1': [ 0, 5, 0, 5], '2' : [ 0, 5, 5,10], '3' : [ 0, 5,10,15],
               '4': [ 5,10, 0, 5], '5' : [ 5,10, 5,10], '6' : [ 5,10,10,15],
               '7': [10,15, 0, 5], '8' : [10,15, 5,10], '9' : [10,15,10,15]}
-    for i in '123456789' : # 0 must be least
+    for i in '123456789' :
         if sector[i][0] <= xy[0] < sector[i][1] and sector[i][2] <= xy[1] < sector[i][3] : 
             return int(i)
 
 def dir_converter(key) :
-    dir_dic = { (-1, 0) : 'N', 'N' : (-1, 0),
-                ( 1, 0) : 'S', 'S' : ( 1, 0),
-                ( 0,-1) : 'E', 'E' : ( 0,-1),
-                ( 0, 1) : 'W', 'W' : ( 0, 1) }
+    # NB : can't put list of tuple as key
+    dir_dic = { (-1, 0) : 'N', 'N' : [(-1, 0)],
+                ( 1, 0) : 'S', 'S' : [( 1, 0)],
+                ( 0,-1) : 'W', 'W' : [( 0,-1)],
+                ( 0, 1) : 'E', 'E' : [( 0, 1)],
+                'silence' : list(set([(x,0) for x in range(-4,5)] + [(0,y) for y in range(-4,5)])) }
     return dir_dic[key]
 
 # start_tile
@@ -113,6 +115,17 @@ def random_path(lenght,size) :
                 counter += 1
                 if counter <= 6 : continue
                 else : break
+
+# game_loop 
+
+def manage_order(my_position, index, order, dir_map, sector_map) :
+    message_order = [cursor.split() for cursor in order.split('|')]
+    for order_cursor in message_order :
+        if (order_cursor[0] == 'MOVE' or order_cursor[0] == 'MOVE'
+           ) : dir_map['dir'].append( dir_converter(order_cursor[1]) )
+        elif (order_cursor[0] == 'TORPEDO' or order_cursor[0] == 'SURFACE' or order_cursor[0] == 'SONAR'
+           ) : sector_map = 'config_sector_map(my_position, order_cursor[1], sector_map)'
+    return dir_map, sector_map
 
 # run path : cursor
 
@@ -148,7 +161,11 @@ def config_dir_map(dir_) :
                'fork' :   [idx for idx in range(len(dir_)) if len(dir_[idx]) != 1],
                }
     return dir_map
+    
+# run_path sector_map
 
+def config_sector_map() :
+    return 'to do'
 # run_path : fork_map
             
 def config_fork_map (dir_map) :
@@ -263,11 +280,12 @@ def start(play_map, start_laps) :
             if try_ % (play_map['size']**2) == 0 : idx += 1
 
 def game_loop(start_path) :
+    his_order = {'dir': [], 'sector' : }
     while True :
 
         x, y, my_life, opp_life, torpedo_cooldown, sonar_cooldown, silence_cooldown, mine_cooldown = [int(i) for i in input().split()]
         sonar_result = input()
-        opponent_orders = input()
+        his_orders = input()
 
         direction = dir_converter( start_path['dir'][0][0] )
         start_path['dir'].pop(0)
