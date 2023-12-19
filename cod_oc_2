@@ -62,15 +62,17 @@ def config_play_map() :
 
 # run path : map
 
-def off_side_tile (tile, size) :
-    x,y = tile
-    return (x not in range(0,size) or y not in range(0,size))
 
 def off_side_path(path, size, command = 'done') :
+
     if command == 'done' : n_s, e_w = path['max']
     else :
         n_s = abs( sum([xy[0][0] for xy in path]) )
         e_w = abs( sum([xy[0][1] for xy in path]) )
+    return (n_s > size or e_w > size)
+
+def off_side_tile(max, size) :
+    n_s, e_w = max
     return (n_s > size or e_w > size)
 
 def sector (xy) :
@@ -85,8 +87,8 @@ def dir_converter(key) :
     # NB : can't put list of tuple as key
     dir_dic = { (-1, 0) : 'N', 'N' : [(-1, 0)],
                 ( 1, 0) : 'S', 'S' : [( 1, 0)],
-                ( 0,-1) : 'W', 'W' : [( 0,-1)],
-                ( 0, 1) : 'E', 'E' : [( 0, 1)],
+                ( 0,-1) : 'E', 'E' : [( 0,-1)],
+                ( 0, 1) : 'W', 'W' : [( 0, 1)],
                 'silence' : list(set([(x,0) for x in range(-4,5)] + [(0,y) for y in range(-4,5)])) }
     return dir_dic[key]
 
@@ -231,14 +233,15 @@ def update_fork_map(fork, fork_map):
 # run_path : controller
 
 def blocking(tile, play_map, sector = {}, index = None) : # revoir : sector_map
-    blocking = ( True 
-                        if tile in play_map['island'] 
-                        or off_side_tile(tile, play_map['size']) 
-                        or ( sector['in'].get(index) != None 
-                             and sector['in'].get(index) != sector(tile) )
-                        or ( sector['out'].get(index) != None
-                             and tile not in sector['out'].get(index) )
-                        else False )
+    blocking = (    True 
+                    if tile in play_map['island'] 
+                    or off_side_tile(tile, play_map['size']) 
+                    or ( sector['in'].get(index) != None 
+                            and sector['in'].get(index) != sector(tile) )
+                    or ( sector['out'].get(index) != None
+                         and tile not in sector['out'].get(index) )
+                    else False
+                )
     return blocking
 
 def stop(fork_map) :
@@ -258,7 +261,7 @@ def run_map(play_map, dir_map, init_fork_map ={'fork':{}}, command ='gameloop') 
         if off_side_path(dir_map, play_map['size']) : continue
         fork_map = copy.deepcopy(init_fork_map)
         possible_path[tile] = run_path(tile, play_map, dir_map, fork_map)     
-    if command == 'gameloop' : show_map(possible_path, play_map)
+    # if command == 'gameloop' : show_map(possible_path, play_map)
     return possible_path
 
 def run_path(tile, play_map, dir_map, fork_map) :
@@ -299,10 +302,10 @@ def start(play_map, start_laps) :
     while True :
         random_dir_map = random_path(start_laps,play_map['size'])
         possible_path = run_map( play_map,
-                                 dir_map = random_dir_map,
+                                 random_dir_map,
                                  command = 'start tile')
         if sum(possible_path.values()) > nb_tile[idx] :
-            return ( choice( list(possible_path.keys()) ),
+            return ( choice( [key for key in possible_path if possible_path[key] != 0] ),
                      random_dir_map )
         else : 
             try_ += 1
