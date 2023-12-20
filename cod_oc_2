@@ -71,8 +71,8 @@ def off_side_path(path, size, command = 'done') :
         e_w = abs( sum([xy[0][1] for xy in path]) )
     return (n_s > size or e_w > size)
 
-def off_side_tile(max, size) :
-    n_s, e_w = max
+def off_side_tile(max_, size) :
+    n_s, e_w = max_
     return (n_s > size or e_w > size)
 
 def sector (xy) :
@@ -232,7 +232,7 @@ def update_fork_map(fork, fork_map):
 
 # run_path : controller
 
-def blocking(tile, play_map, sector = {}, index = None) : # revoir : sector_map
+def blocking(tile, play_map, sector, index = None) : # revoir : sector_map
     blocking = (    True 
                     if tile in play_map['island'] 
                     or off_side_tile(tile, play_map['size']) 
@@ -300,12 +300,17 @@ def start(play_map, start_laps) :
     idx = 0
     try_ = 0
     while True :
-        random_dir_map = random_path(start_laps,play_map['size'])
+        # random_dir_map = random_path(start_laps,play_map['size'])
+        random_dir_map = [[(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)],
+                         [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(0,1)]]
+        random_dir_map = config_dir_map(random_dir_map)
         possible_path = run_map( play_map,
                                  random_dir_map,
                                  command = 'start tile')
+        #
+        print(possible_path)
         if sum(possible_path.values()) > nb_tile[idx] :
-            return ( choice( [key for key in possible_path if possible_path[key] != 0] ),
+            return ( choice( [key for key in possible_path if possible_path[key] == 1] ),
                      random_dir_map )
         else : 
             try_ += 1
