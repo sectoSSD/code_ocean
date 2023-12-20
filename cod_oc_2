@@ -41,6 +41,7 @@ def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
 # tools
 
 from random import choice
+from random import randrange
 from time import perf_counter
 import copy
 
@@ -67,13 +68,13 @@ def off_side_path(path, size, command = 'done') :
 
     if command == 'done' : n_s, e_w = path['max']
     else :
-        n_s = abs( sum([xy[0][0] for xy in path]) )
-        e_w = abs( sum([xy[0][1] for xy in path]) )
-    return (n_s > size or e_w > size)
+        e_w = abs( sum([xy[0][0] for xy in path]) )
+        n_s = abs( sum([xy[0][1] for xy in path]) )
+    return (n_s >= size or e_w >= size)
 
-def off_side_tile(max_, size) :
-    n_s, e_w = max_
-    return (n_s > size or e_w > size)
+def off_side_tile (tile, size) :
+    x,y = tile
+    return (x not in range(0,size) or y not in range(0,size))
 
 def sector (xy) :
     sector = {'1': [ 0, 5, 0, 5], '2' : [ 0, 5, 5,10], '3' : [ 0, 5,10,15],
@@ -85,10 +86,10 @@ def sector (xy) :
 
 def dir_converter(key) :
     # NB : can't put list of tuple as key
-    dir_dic = { (-1, 0) : 'N', 'N' : [(-1, 0)],
-                ( 1, 0) : 'S', 'S' : [( 1, 0)],
-                ( 0,-1) : 'E', 'E' : [( 0,-1)],
-                ( 0, 1) : 'W', 'W' : [( 0, 1)],
+    dir_dic = { (-1, 0) : 'W', 'W' : [(-1, 0)],
+                ( 1, 0) : 'E', 'E' : [( 1, 0)],
+                ( 0,-1) : 'N', 'N' : [( 0,-1)],
+                ( 0, 1) : 'S', 'S' : [( 0, 1)],
                 'silence' : list(set([(x,0) for x in range(-4,5)] + [(0,y) for y in range(-4,5)])) }
     return dir_dic[key]
 
@@ -232,7 +233,7 @@ def update_fork_map(fork, fork_map):
 
 # run_path : controller
 
-def blocking(tile, play_map, sector, index = None) : # revoir : sector_map
+def blocking(tile, play_map, sector = {}, index = None) : # revoir : sector_map
     blocking = (    True 
                     if tile in play_map['island'] 
                     or off_side_tile(tile, play_map['size']) 
@@ -296,25 +297,32 @@ def run_path(tile, play_map, dir_map, fork_map) :
 
 # game
 def start(play_map, start_laps) :
-    nb_tile = [25,16,9,4,1]
-    idx = 0
-    try_ = 0
-    while True :
-        # random_dir_map = random_path(start_laps,play_map['size'])
-        random_dir_map = [[(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)],
-                         [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(0,1)]]
-        random_dir_map = config_dir_map(random_dir_map)
-        possible_path = run_map( play_map,
-                                 random_dir_map,
+    nb_tile, try_ = 0, 0
+    possible_path,  random_dir_map = [], []
+
+    while try_ < 100 :
+        current_random_dir_map = random_path(start_laps,play_map['size'])
+        """
+        current_random_dir_map = [[(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)],
+                         [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(0,1)], [(0,1)]]
+        current_random_dir_map = config_dir_map(current_random_dir_map)
+        """
+        current_possible_path = run_map( play_map,
+                                 current_random_dir_map,
                                  command = 'start tile')
-        #
-        print(possible_path)
-        if sum(possible_path.values()) > nb_tile[idx] :
-            return ( choice( [key for key in possible_path if possible_path[key] == 1] ),
-                     random_dir_map )
-        else : 
-            try_ += 1
-            if try_ % (play_map['size']**2) == 0 : idx += 1
+        if sum(current_possible_path.values()) > nb_tile :
+            nb_tile = sum(current_possible_path.values()) 
+            possible_path  = [current_possible_path]
+            random_dir_map = [current_random_dir_map]
+        elif sum(current_possible_path.values()) == nb_tile :
+            possible_path.append(current_possible_path)
+            random_dir_map.append(current_random_dir_map)
+        try_ += 1
+    idx = randrange(len(possible_path))
+    possible_path = possible_path[idx]
+    start_tile = choice( [key for key in possible_path if possible_path[key] == 1] )
+    random_dir_map = random_dir_map[idx]
+    return start_tile, random_dir_map
 
 def game_loop(my_dir_map, his_dir_map, play_map) :
     lap = 0
@@ -336,9 +344,9 @@ def game_loop(my_dir_map, his_dir_map, play_map) :
 def main():
     start_laps = 16 # == lenght_path
     play_map = config_play_map()
-    start_tile, my_dir_map = start(play_map, start_laps)
+    start_tile, my_dir_map = start(play_map, start_laps) 
     his_dir_map = config_dir_map([])
-    print(*start_tile)
+    print(*start_tile, sep = ' ')
     game_loop(my_dir_map, his_dir_map, play_map)  
 
 if __name__ == '__main__' : main()
