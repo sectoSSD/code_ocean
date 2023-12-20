@@ -53,6 +53,7 @@ def off_side_tile (tile, size) :
     return (x not in range(0,size) or y not in range(0,size))
 
 def off_side_path(path, size, command = 'done') :
+
     if command == 'done' : n_s, e_w = path['max']
     else :
         n_s = abs( sum([xy[0][0] for xy in path]) )
