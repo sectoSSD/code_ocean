@@ -3,9 +3,9 @@
 
 def show_map(content, play_map) :
     # give graphics overview of the value of each tiles, content is a dic with tuple (x,y) as key
-    for x in range(play_map['size']):
+    for y in range(play_map['size']):
         line = []
-        for y in range(play_map['size']):
+        for x in range(play_map['size']):
             try : line.append(f'{content[x,y]:02}')
             except KeyError : line.append('XX')
         print(*line, sep=' ')   
@@ -39,60 +39,138 @@ def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
         else : pass
 
 # tools
+
 from random import choice
+from random import randrange
 from time import perf_counter
 import copy
 
 def add_tuple (tuple_1, tuple_2) :
     return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
 
+# play_map
+
+def config_play_map() :
+    """
+    width, height, my_id = [int(i) for i in input().split()]
+    size = width if width == height else 'problem'
+    island, brows = [], []
+    
+    for y in range(size):
+        line = input()
+        for x in range(size) :
+            if line[x] == 'x' : island.append((x,y))
+            else : brows.append((x,y))
+    """
+    size = 15
+    
+    island = [(14, y) for y in range(size) if y not in range(7,10)]
+    brows = [(x,y) for y in range(size) for x in range(size) if (x,y) not in island]
+    return {'island' : island, 'size' : size, 'brows' : brows}
+
 # run path : map
+
+def off_side_max(max_, size) :
+    e_w, n_s = max_
+    return (e_w not in range(0,size) or n_s not in range(0,size))
+
+def off_side_path(path, size) :
+    e_w = sum([xy[0][0] for xy in path if len(xy) == 1])
+    n_s = sum([xy[0][1] for xy in path if len(xy) == 1])
+    return (e_w not in range(0,size) or n_s not in range(0,size))
 
 def off_side_tile (tile, size) :
     x,y = tile
-    return (x not in range(0,size) or y not in range(0,size))
-
-def off_side_path(path, size, command = 'done') :
-
-    if command == 'done' : n_s, e_w = path['max']
-    else :
-        n_s = abs( sum([xy[0][0] for xy in path]) )
-        e_w = abs( sum([xy[0][1] for xy in path]) )
-    return (n_s > size or e_w > size)
+    return (x not in range(0,size) or y not in range(0,size)) # 1 c'est pas logique
 
 def sector (xy) :
     sector = {'1': [ 0, 5, 0, 5], '2' : [ 0, 5, 5,10], '3' : [ 0, 5,10,15],
               '4': [ 5,10, 0, 5], '5' : [ 5,10, 5,10], '6' : [ 5,10,10,15],
               '7': [10,15, 0, 5], '8' : [10,15, 5,10], '9' : [10,15,10,15]}
-    for i in '123456789' : # 0 must be least
+    for i in '123456789' :
         if sector[i][0] <= xy[0] < sector[i][1] and sector[i][2] <= xy[1] < sector[i][3] : 
             return int(i)
 
-# start_tile
+def dir_converter(key) :
+    # NB : can't put list of tuple as key
+    dir_dic = { (-1, 0) : 'W', 'W' : [(-1, 0)],
+                ( 1, 0) : 'E', 'E' : [( 1, 0)],
+                ( 0,-1) : 'N', 'N' : [( 0,-1)],
+                ( 0, 1) : 'S', 'S' : [( 0, 1)],
+                'silence' : list(set([(x,0) for x in range(-4,5)] + [(0,y) for y in range(-4,5)])) }
+    return dir_dic[key]
 
-def random_path(lenght,size) :
+# start_tile
+ 
+def random_path(lenght,size) : # a debugger
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
     while True :
         current_direction_path = []
         current_tile = (size,size)
         current_tile_path = [current_tile]
+        temp_direction_path = []
         counter = 0
         while True :
-            current_direction = choice(direction)
-            temp_tile = add_tuple(current_tile,current_direction[0])
+            temp_direction = choice(direction)
+            temp_tile = add_tuple(current_tile,temp_direction[0])
+            temp_direction_path.append(temp_direction)
             if ( temp_tile not in current_tile_path 
-                 and off_side_path(current_direction_path, size, command = 'do yourslef') == False ):
+                 and off_side_path(temp_direction_path, size) == False ):
                 current_tile = temp_tile
+                current_direction_path = temp_direction_path
                 current_tile_path.append(current_tile)
-                current_direction_path.append(current_direction)
                 if len(current_direction_path) == lenght : 
                     return config_dir_map(current_direction_path)
                 counter = 0
             else :
                 temp_tile = current_tile
+                temp_direction_path = current_direction_path
                 counter += 1
                 if counter <= 6 : continue
                 else : break
+
+# game_loop : orders
+
+def torpedo_area(center, play_map) :
+    ref_position = center
+    current_position = ref_position
+    direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
+    torpedo_area = []
+    torpedo_range = 4
+    range_, try_, max_try = 0, 0, torpedo_range**6
+    while True :
+        try_ += 1
+        range_ += 1
+        current_direction = choice(direction)
+        current_position = add_tuple(current_position,current_direction[0])
+        if blocking(current_position, play_map) :
+            current_position = ref_position
+            range_ = 0
+            continue
+        if current_position not in torpedo_area and current_position != ref_position :
+            torpedo_area.append(current_position)
+            current_position = ref_position
+            try_ = 0
+            range_ = 0
+        if range_ == torpedo_range : 
+            current_position = ref_position
+            range_ = 0
+        if try_ == max_try or len(torpedo_area) == 40 : return torpedo_area
+
+def manage_order(index, order, dir_map, play_map, sonar_result) :
+    message_order = [cursor.split() for cursor in order.split('|')]
+    for order_cursor in message_order :
+        if order_cursor[0] == 'MOVE' : dir_map['dir'].append( dir_converter(order_cursor[1]) )
+        elif order_cursor[0] == 'SILENCE' : dir_map['dir'].append(dir_converter('silence'))
+        elif (order_cursor[0] == 'SURFACE' or order_cursor[0] == 'SONAR'
+           ) : dir_map['sector']['in'][index] = order_cursor[1]
+        elif order_cursor[0] == 'TORPEDO' :
+            shoot_tile = order_cursor[1], order_cursor[2]
+            dir_map['sector']['tiles'][index] = torpedo_area(shoot_tile, play_map)
+        if 'NA' not in sonar_result : 
+            if   sonar_result[1] == 'Y' : dir_map['sector']['in'][index - 1] = sonar_result[0]
+            elif sonar_result[1] == 'N' : dir_map['sector']['out'][index - 1] = sonar_result[0]
+    return config_dir_map(dir_map['dir'], dir_map['sector'])
 
 # run path : cursor
 
@@ -101,11 +179,12 @@ def initial_cursor(dir_map, fork_map, tile) :
     # 'idx' : current index in dir_map
     # 'fork' : least embranchement '' if no fork
     # 'tile' : current tile on map
-    init_cursor = {'dir' : (), 'idx' : 0, 'tile' : tile }
+    init_cursor = {'dir' : (), 'idx' : 0, 'tile' : () }
     
     init_cursor['dir'] = ( dir_map['dir'][0][fork_map['fork'][0]-1] 
                           if fork_map['fork'].get(0) != None
                           else dir_map['dir'][0][0])
+    init_cursor['tile'] = add_tuple(tile, init_cursor['dir'])
     return init_cursor
 
 def update_cursor (cursor, dir_map, fork_map) :
@@ -116,19 +195,19 @@ def update_cursor (cursor, dir_map, fork_map) :
                             else 0 )
     
     cursor['dir'] = dir_map['dir'][ cursor['idx'] ] [branch_index]
-    cursor['tile'] = add_tuple(cursor['dir'], cursor['tile'])
+    cursor['tile'] = add_tuple(cursor['tile'], cursor['dir'])
     return cursor
+
 # run_path : dir_map
 
-def config_dir_map(dir_, sector = {'in' : {}, 'out' : {}, 'tiles' : {}} ) :
-    dir_map = {'dir' : dir_ , 
-               'max' :  ( abs( sum([xy[0][0] for xy in dir_ if len(xy) == 1]) ),
-                          abs( sum([xy[0][1] for xy in dir_ if len(xy) == 1]) )), 
-               'length' : len(dir_),
-               'fork'   : [idx for idx in range(len(dir_)) if len(dir_[idx]) != 1],
+def config_dir_map(dir_path, sector = {'in' : {}, 'out' : {}, 'tiles' : {}} ) :
+    return     {'dir' : dir_path , 
+               'max' :  ( sum([xy[0][0] for xy in dir_path if len(xy) == 1]) ,
+                          sum([xy[0][1] for xy in dir_path if len(xy) == 1]) ), 
+               'length' : len(dir_path),
+               'fork'   : [idx for idx in range(len(dir_path)) if len(dir_path[idx]) != 1],
                'sector' : sector
                 }
-    return dir_map
 
 # run_path : fork_map
             
@@ -184,20 +263,19 @@ def stop(fork_map) :
         return True
     else : return False
 
-###
+# main engine
 
 def run_map(play_map, dir_map, init_fork_map ={'fork':{}}, command ='gameloop') :
     # integrer dans un run map un filtre ('max_NS','max_EW')
     possible_path = {}
     for tile in play_map['brows'] :
-        if off_side_path(dir_map, play_map['size']) : continue
+        #if off_side_max( add_tuple(tile, dir_map['max']), play_map['size']) : continue
         fork_map = copy.deepcopy(init_fork_map)
         possible_path[tile] = run_path(tile, play_map, dir_map, fork_map)     
     if command == 'gameloop' : show_map(possible_path, play_map)
     return possible_path
 
 def run_path(tile, play_map, dir_map, fork_map) :
-   # define dir_ and sector when necessary
     cursor = initial_cursor(dir_map, fork_map, tile)
     controller = {'blocking' : False,  'end_path' : False, 'stop' : True}
     possible_path = 0 # possible path for this tile
@@ -227,42 +305,64 @@ def run_path(tile, play_map, dir_map, fork_map) :
         
         cursor = update_cursor(cursor, dir_map, fork_map)
 
-def start_tile(play_map, start_laps) :
-    nb_tile = [25,16,9,4,1]
-    idx = 0
-    try_ = 0
-    while True :
-        random_dir_map = random_path(start_laps,play_map['size'])
-        possible_path = run_map( play_map,
-                                 random_dir_map,
+# game
+def start(play_map, start_laps) :
+    nb_tile, try_ = 0, 0
+    possible_path,  random_dir_map = [], []
+
+    while try_ < 100 :
+        ### current_random_dir_map = random_path(start_laps,play_map['size'])
+        
+        current_random_dir_map = [[(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)],
+                                  [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(0,1)], [(0,1)]]
+        current_random_dir_map = config_dir_map(current_random_dir_map)
+        """
+        current_possible_path = run_map( play_map,
+                                 current_random_dir_map,
                                  command = 'start tile')
-        if sum(possible_path.values()) > nb_tile[idx] :
-            return ( choice( list(possible_path.keys()) ),
-                     random_dir_map )
-        else : 
-            try_ += 1
-            if try_ % (play_map['size']**2) == 0 : idx += 1
+        """
+        current_possible_path = run_map( play_map,
+                                 current_random_dir_map)
+        if sum(current_possible_path.values()) > nb_tile :
+            nb_tile = sum(current_possible_path.values()) 
+            possible_path  = [current_possible_path]
+            random_dir_map = [current_random_dir_map]
+        elif sum(current_possible_path.values()) == nb_tile :
+            possible_path.append(current_possible_path)
+            random_dir_map.append(current_random_dir_map)
+        try_ += 1
+    idx = randrange(len(possible_path))
+    possible_path = possible_path[idx]
+    print(possible_path)
+    start_tile = choice( [key for key in possible_path if possible_path[key] > 0] )
+    random_dir_map = random_dir_map[idx]
+    return start_tile, random_dir_map
+
+"""
+def game_loop(my_dir_map, his_dir_map, play_map) :
+    lap = 0
+    sonar_result = 'NA'
+    while True :
+
+        x, y, my_life, opp_life, torpedo_cooldown, sonar_cooldown, silence_cooldown, mine_cooldown = [int(i) for i in input().split()]
+        my_position = (x,y)
+        sonar_result = sonar_result, input()
+
+        his_dir_map = manage_order(lap, input(), his_dir_map, play_map, sonar_result)
+
+        direction = dir_converter( my_dir_map['dir'][lap][0] )
+
+        sonar_result = 0 if sonar_result else 'NA' # put here sector if make sonar research
+        print(f'MOVE {direction} SILENCE')
+        lap += 1
+"""
 
 def main():
-    start_time = perf_counter()
-    size = 15
-    island = [(0,x) for x in range(15) if x != 7]
     start_laps = 16 # == lenght_path
-    brows = [(x,y) for x in range(size) for y in range(size) if (x,y) not in island]
-    play_map = {'island' : island, 'size' : size, 'brows' : brows}
-    
-    # print(start_tile(play_map, start_laps))
-
-    dir_ =  [[(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)],
-             [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)]]
-    dir_map = config_dir_map(dir_)
-    init_fork_map = config_fork_map(dir_map) # map of embranchement
-    print(f"play_map : {play_map['island']}")
-    print(f'dir_map : {dir_map}')
-    
-    run_map(play_map, dir_map, init_fork_map)
-
-  
-    print(f' time : {perf_counter() - start_time}')
+    play_map = config_play_map()
+    start_tile, my_dir_map = start(play_map, start_laps) 
+    his_dir_map = config_dir_map([])
+    print(*start_tile, sep = ' ')
+    # game_loop(my_dir_map, his_dir_map, play_map)  
 
 if __name__ == '__main__' : main()
