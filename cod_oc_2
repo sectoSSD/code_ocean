@@ -63,18 +63,18 @@ def config_play_map() :
 
 # run path : map
 
+def off_side_max(max_, size) :
+    e_w, n_s = max_
+    return (e_w not in range(0,size) or n_s not in range(0,size))
 
-def off_side_path(path, size, command = 'done') :
-
-    if command == 'done' : n_s, e_w = path['max']
-    else :
-        e_w = abs( sum([xy[0][0] for xy in path]) )
-        n_s = abs( sum([xy[0][1] for xy in path]) )
-    return (n_s >= size or e_w >= size)
+def off_side_path(path, size) :
+    e_w = sum([xy[0][0] for xy in path if len(xy) == 1])
+    n_s = sum([xy[0][1] for xy in path if len(xy) == 1])
+    return (e_w not in range(0,size) or n_s not in range(0,size))
 
 def off_side_tile (tile, size) :
     x,y = tile
-    return (x not in range(0,size) or y not in range(0,size))
+    return (x not in range(1,size) or y not in range(1,size)) # 1 c'est pas logique
 
 def sector (xy) :
     sector = {'1': [ 0, 5, 0, 5], '2' : [ 0, 5, 5,10], '3' : [ 0, 5,10,15],
@@ -94,27 +94,30 @@ def dir_converter(key) :
     return dir_dic[key]
 
 # start_tile
-
-def random_path(lenght,size) :
+ 
+def random_path(lenght,size) : # a debugger
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
     while True :
         current_direction_path = []
         current_tile = (size,size)
         current_tile_path = [current_tile]
+        temp_direction_path = []
         counter = 0
         while True :
-            current_direction = choice(direction)
-            temp_tile = add_tuple(current_tile,current_direction[0])
+            temp_direction = choice(direction)
+            temp_tile = add_tuple(current_tile,temp_direction[0])
+            temp_direction_path.append(temp_direction)
             if ( temp_tile not in current_tile_path 
-                 and off_side_path(current_direction_path, size, command = 'do yourslef') == False ):
+                 and off_side_path(temp_direction_path, size) == False ):
                 current_tile = temp_tile
+                current_direction_path = temp_direction_path
                 current_tile_path.append(current_tile)
-                current_direction_path.append(current_direction)
                 if len(current_direction_path) == lenght : 
                     return config_dir_map(current_direction_path)
                 counter = 0
             else :
                 temp_tile = current_tile
+                temp_direction_path = current_direction_path
                 counter += 1
                 if counter <= 6 : continue
                 else : break
@@ -189,15 +192,14 @@ def update_cursor (cursor, dir_map, fork_map) :
 
 # run_path : dir_map
 
-def config_dir_map(dir_, sector = {'in' : {}, 'out' : {}, 'tiles' : {}} ) :
-    dir_map = {'dir' : dir_ , 
-               'max' :  ( abs( sum([xy[0][0] for xy in dir_ if len(xy) == 1]) ),
-                          abs( sum([xy[0][1] for xy in dir_ if len(xy) == 1]) )), 
-               'length' : len(dir_),
-               'fork'   : [idx for idx in range(len(dir_)) if len(dir_[idx]) != 1],
+def config_dir_map(dir_path, sector = {'in' : {}, 'out' : {}, 'tiles' : {}} ) :
+    return     {'dir' : dir_path , 
+               'max' :  ( sum([xy[0][0] for xy in dir_path if len(xy) == 1]) ,
+                          sum([xy[0][1] for xy in dir_path if len(xy) == 1]) ), 
+               'length' : len(dir_path),
+               'fork'   : [idx for idx in range(len(dir_path)) if len(dir_path[idx]) != 1],
                'sector' : sector
                 }
-    return dir_map
 
 # run_path : fork_map
             
@@ -259,7 +261,7 @@ def run_map(play_map, dir_map, init_fork_map ={'fork':{}}, command ='gameloop') 
     # integrer dans un run map un filtre ('max_NS','max_EW')
     possible_path = {}
     for tile in play_map['brows'] :
-        if off_side_path(dir_map, play_map['size']) : continue
+        #if off_side_max( add_tuple(tile, dir_map['max']), play_map['size']) : continue
         fork_map = copy.deepcopy(init_fork_map)
         possible_path[tile] = run_path(tile, play_map, dir_map, fork_map)     
     # if command == 'gameloop' : show_map(possible_path, play_map)
@@ -301,12 +303,12 @@ def start(play_map, start_laps) :
     possible_path,  random_dir_map = [], []
 
     while try_ < 100 :
-        current_random_dir_map = random_path(start_laps,play_map['size'])
-        """
+        ### current_random_dir_map = random_path(start_laps,play_map['size'])
+        
         current_random_dir_map = [[(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)],
-                         [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(0,1)], [(0,1)]]
+                                  [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(-1,0)], [(0,1)], [(0,1)]]
         current_random_dir_map = config_dir_map(current_random_dir_map)
-        """
+
         current_possible_path = run_map( play_map,
                                  current_random_dir_map,
                                  command = 'start tile')
@@ -320,7 +322,8 @@ def start(play_map, start_laps) :
         try_ += 1
     idx = randrange(len(possible_path))
     possible_path = possible_path[idx]
-    start_tile = choice( [key for key in possible_path if possible_path[key] == 1] )
+    print(possible_path)
+    start_tile = choice( [key for key in possible_path if possible_path[key] > 0] )
     random_dir_map = random_dir_map[idx]
     return start_tile, random_dir_map
 
