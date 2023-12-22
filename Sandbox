@@ -1,4 +1,3 @@
-# ecrire show_path
 
 # debug
 
@@ -11,8 +10,26 @@ def show_map(content, play_map) :
             except KeyError : line.append('XX')
         print(*line, sep=' ')   
 
-def show_path(path_, size):
-    return 'xxx'
+def show_path(path):
+    tile_cursor = (0,0)
+    path_cursor = [tile_cursor]
+    for direction in path :
+        tile_cursor = add_tuple(tile_cursor, direction[0])
+        path_cursor.append( tile_cursor)
+    
+    min_x = min([xy[0] for xy in path_cursor])
+    min_y = min([xy[1] for xy in path_cursor])
+    correction = -min_x, -min_y
+    path_cursor = list(map(lambda xy : add_tuple(xy, correction),path_cursor))
+    max_x = max([xy[0] for xy in path_cursor])
+    max_y = max([xy[1] for xy in path_cursor])
+    
+    for y in range(max_y + 1) :
+        line = []
+        for x in range(max_x + 1) :
+            if (x,y) in path_cursor : line.append('x')
+            else : line.append('_')
+        print(*line, sep=' ')
 
 def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
         """ position in debug line:
@@ -45,6 +62,7 @@ def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
 # tools
 
 from random import choice
+from random import choices
 from random import randrange
 from time import perf_counter
 from math import log10
@@ -114,9 +132,16 @@ def random_path(lenght,size) : # a debugger
         current_tile = (size,size)
         current_tile_path = [current_tile]
         temp_direction_path = []
+        temp_direction = [(0,0)]
         counter = 0
         while True :
-            temp_direction = choice(direction)
+            # temp_direction = choice(direction)
+            reverse_tp_dir = [(temp_direction[0][0]*-1, temp_direction[0][1]*-1)]
+            
+            weight_direction = [2 if cursor == temp_direction 
+                                  else 0 if cursor == reverse_tp_dir 
+                                         else 0.25                      for cursor in direction ]
+            temp_direction = choices(direction, weight_direction)[0]
             temp_tile = add_tuple(current_tile,temp_direction[0])
             temp_direction_path.append(temp_direction)
             if ( temp_tile not in current_tile_path 
@@ -128,8 +153,7 @@ def random_path(lenght,size) : # a debugger
                     return config_dir_map(current_direction_path)
                 counter = 0
             else :
-                temp_tile = current_tile
-                temp_direction_path = current_direction_path
+                temp_direction_path.pop(-1)
                 counter += 1
                 if counter <= 6 : continue
                 else : break
@@ -360,9 +384,9 @@ def start(play_map, start_laps) :
     idx = randrange(len(possible_path))
     possible_path = possible_path[idx]
     show_map(possible_path, play_map)
-    print(random_dir_map)
     start_tile = choice( [key for key in possible_path if possible_path[key] > 0] )
     random_dir_map = random_dir_map[idx]
+    show_path(random_dir_map['dir'])
     return start_tile, random_dir_map
 
 """
