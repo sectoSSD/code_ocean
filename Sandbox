@@ -21,13 +21,16 @@ def show_path(path):
     min_y = min([xy[1] for xy in path_cursor])
     correction = -min_x, -min_y
     path_cursor = list(map(lambda xy : add_tuple(xy, correction),path_cursor))
+    path_cursor = { key : value for value,key in enumerate(path_cursor) }
+    dic = {key : value for key,value in enumerate(path_cursor)}
     max_x = max([xy[0] for xy in path_cursor])
     max_y = max([xy[1] for xy in path_cursor])
     
     for y in range(max_y + 1) :
         line = []
         for x in range(max_x + 1) :
-            if (x,y) in path_cursor : line.append('x')
+            if (x,y) in path_cursor : 
+                line.append(path_cursor[(x,y)])
             else : line.append('_')
         print(*line, sep=' ')
 
@@ -409,7 +412,7 @@ def game_loop(my_dir_map, his_dir_map, play_map) :
 """
 
 def main():
-    start_laps = 16 # == lenght_path
+    start_laps = 24 # == lenght_path
     play_map = config_play_map()
     start_tile, my_dir_map = start(play_map, start_laps) 
     his_dir_map = config_dir_map([])
