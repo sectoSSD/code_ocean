@@ -65,7 +65,6 @@ def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
 
 from random import choice
 from random import choices
-from random import randrange
 from time import perf_counter
 from math import log10
 import copy
@@ -127,7 +126,7 @@ def dir_converter(key) :
 
 # start_tile
  
-def random_path(lenght,size) : # a debugger
+def random_path(lenght,size) :
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
     while True :
         current_direction_path = []
@@ -358,6 +357,7 @@ def run_path(tile, play_map, dir_map, fork_map) :
 # game
 
 def start(play_map, start_laps) :
+    "debut de fonction (app)"
     best_scatter, scatter, try_ = 0, 0, 0
     possible_path,  random_dir_map = [], []
 
@@ -383,38 +383,38 @@ def start(play_map, start_laps) :
             random_dir_map.append(current_random_dir_map)
         print(best_scatter, try_)
         try_ += 1
-    idx = randrange(len(possible_path))
-    possible_path = possible_path[idx]
+    "fin de fonction"
+    possible_path = choice(possible_path)
     show_map(possible_path, play_map)
     start_tile = choice( [key for key in possible_path if possible_path[key] > 0] )
-    random_dir_map = random_dir_map[idx]
-    show_path(random_dir_map['dir'])
-    return start_tile, random_dir_map
+    return start_tile
 
-"""
-def game_loop(my_dir_map, his_dir_map, play_map) :
+
+def game_loop(play_map) :
     lap = 0
     sonar_result = 'NA'
+    his_dir_map = config_dir_map([])
+    my_dir_map = config_dir_map([])
+    
     while True :
-
+        """
         x, y, my_life, opp_life, torpedo_cooldown, sonar_cooldown, silence_cooldown, mine_cooldown = [int(i) for i in input().split()]
         my_position = (x,y)
         sonar_result = sonar_result, input()
-
+        """
+        
         his_dir_map = manage_order(lap, input(), his_dir_map, play_map, sonar_result)
 
         direction = dir_converter( my_dir_map['dir'][lap][0] )
 
-        sonar_result = 0 if sonar_result else 'NA' # put here sector if make sonar research
-        print(f'MOVE {direction} SILENCE')
         lap += 1
-"""
+
 
 def main():
     start_laps = 24 # == lenght_path
     play_map = config_play_map()
-    start_tile, my_dir_map = start(play_map, start_laps) 
-    his_dir_map = config_dir_map([])
+    start_tile = start(play_map, start_laps) 
+    
     print(*start_tile, sep = ' ')
     # game_loop(my_dir_map, his_dir_map, play_map)  
 
