@@ -22,7 +22,6 @@ def show_path(path):
     correction = -min_x, -min_y
     path_cursor = list(map(lambda xy : add_tuple(xy, correction),path_cursor))
     path_cursor = { key : value for value,key in enumerate(path_cursor) }
-    dic = {key : value for key,value in enumerate(path_cursor)}
     max_x = max([xy[0] for xy in path_cursor])
     max_y = max([xy[1] for xy in path_cursor])
     
@@ -30,8 +29,8 @@ def show_path(path):
         line = []
         for x in range(max_x + 1) :
             if (x,y) in path_cursor : 
-                line.append(path_cursor[(x,y)])
-            else : line.append('_')
+                line.append(f'{path_cursor[(x,y)]:02}')
+            else : line.append('__')
         print(*line, sep=' ')
 
 def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
@@ -78,17 +77,15 @@ def add_tuple (tuple_1, tuple_2) :
 
 def config_play_map() :
     width, height, my_id = [int(i) for i in input().split()]
-    size = width if width == height else 'problem'
+    size = width if (width == 15 and height == 15) else 'problem'
     island, brows = [], []
-    
     for y in range(size):
         line = input()
         for x in range(size) :
             if line[x] == 'x' : island.append((x,y))
             else : brows.append((x,y))
-    
-    island = [(14,14),(13,14),(14,13),(13,13),(7,7),(7,8),(8,7),(8,8),(14,3),(14,2),(13,3),(13,2)]
-    brows = [(x,y) for y in range(size) for x in range(size) if (x,y) not in island]
+    # island = [(14,14),(13,14),(14,13),(13,13),(7,7),(7,8),(8,7),(8,8),(14,3),(14,2),(13,3),(13,2)]
+    # brows = [(x,y) for y in range(size) for x in range(size) if (x,y) not in island]
     return {'island' : island, 'size' : size, 'brows' : brows}
 
 # run path : map
@@ -160,8 +157,7 @@ def random_path(lenght,size) : # a debugger
 
 # game_loop : orders
 
-def torpedo_area(center, play_map) :
-    ref_position = center
+def torpedo_area(ref_position, play_map) :
     current_position = ref_position
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
     torpedo_area = []
@@ -192,9 +188,9 @@ def manage_order(index, order, dir_map, play_map, sonar_result) :
         if order_cursor[0] == 'MOVE' : dir_map['dir'].append( dir_converter(order_cursor[1]) )
         elif order_cursor[0] == 'SILENCE' : dir_map['dir'].append(dir_converter('silence'))
         elif (order_cursor[0] == 'SURFACE' or order_cursor[0] == 'SONAR'
-           ) : dir_map['sector']['in'][index] = order_cursor[1]
+           ) : dir_map['sector']['in'][index] = int(order_cursor[1])
         elif order_cursor[0] == 'TORPEDO' :
-            shoot_tile = order_cursor[1], order_cursor[2]
+            shoot_tile = int(order_cursor[1]), int(order_cursor[2])
             dir_map['sector']['tiles'][index] = torpedo_area(shoot_tile, play_map)
         if 'NA' not in sonar_result : 
             if   sonar_result[1] == 'Y' : dir_map['sector']['in'][index - 1] = sonar_result[0]
@@ -272,14 +268,16 @@ def update_fork_map(fork, fork_map):
 
 # run_path : controller
 
-def blocking(tile, play_map, sector = {}, index = None) : # revoir : sector_map
+def blocking(tile, play_map, sector = {'in': {}, 'out' : {}, 'tiles' : {}}, index = None) : # revoir : sector_map
     blocking = (    True 
                     if tile in play_map['island'] 
                     or off_side_tile(tile, play_map['size']) 
                     or ( sector['in'].get(index) != None 
-                            and sector['in'].get(index) != sector(tile) )
+                         and sector['in'].get(index) != sector(tile) )
                     or ( sector['out'].get(index) != None
-                         and tile not in sector['out'].get(index) )
+                         and tile not in sector['out'].get(index)    )
+                    or ( sector['tiles'].get(index) != None 
+                        and tile not in sector['tiles'].get(index)   )
                     else False
                 )
     return blocking
@@ -317,7 +315,7 @@ def run_map(play_map, dir_map, init_fork_map ={'fork':{}}, command ='gameloop') 
     # integrer dans un run map un filtre ('max_NS','max_EW')
     possible_path = {}
     for tile in play_map['brows'] :
-        #if off_side_max( add_tuple(tile, dir_map['max']), play_map['size']) : continue
+        # if off_side_max( add_tuple(tile, dir_map['max']), play_map['size']) : continue
         fork_map = copy.deepcopy(init_fork_map)
         possible_path[tile] = run_path(tile, play_map, dir_map, fork_map)     
     # if command == 'gameloop' : show_map(possible_path, play_map)
@@ -406,7 +404,7 @@ def game_loop(my_dir_map, his_dir_map, play_map) :
         lap += 1
 
 def main():
-    start_laps = 16 # == lenght_path
+    start_laps = 24 # == lenght_path
     play_map = config_play_map()
     start_tile, my_dir_map = start(play_map, start_laps) 
     his_dir_map = config_dir_map([])
