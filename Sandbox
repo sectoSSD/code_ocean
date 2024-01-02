@@ -22,16 +22,15 @@ def show_path(path):
     correction = -min_x, -min_y
     path_cursor = list(map(lambda xy : add_tuple(xy, correction),path_cursor))
     path_cursor = { key : value for value,key in enumerate(path_cursor) }
-    dic = {key : value for key,value in enumerate(path_cursor)}
     max_x = max([xy[0] for xy in path_cursor])
     max_y = max([xy[1] for xy in path_cursor])
     
     for y in range(max_y + 1) :
         line = []
         for x in range(max_x + 1) :
-            if (x,y) in path_cursor : 
-                line.append(path_cursor[(x,y)])
-            else : line.append('_')
+            if (x,y) in path_cursor :
+                line.append(f'{path_cursor[(x,y)]:02}')
+            else : line.append('__')
         print(*line, sep=' ')
 
 def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
