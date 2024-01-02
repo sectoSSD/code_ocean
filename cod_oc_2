@@ -182,7 +182,7 @@ def torpedo_area(ref_position, play_map) :
             range_ = 0
         if try_ == max_try or len(torpedo_area) == 40 : return torpedo_area
 
-def manage_order(index, order, dir_map, play_map, sonar_result) :
+def manage_order(index, order, dir_map, play_map, sonar_result='NA') :
     message_order = [cursor.split() for cursor in order.split('|')]
     for order_cursor in message_order :
         if order_cursor[0] == 'MOVE' : dir_map['dir'].append( dir_converter(order_cursor[1]) )
@@ -386,29 +386,41 @@ def start(play_map, start_laps) :
     # show_path(random_dir_map['dir'])
     return start_tile, random_dir_map
 
-def game_loop(my_dir_map, his_dir_map, play_map) :
+def game_loop(play_map) :
     lap = 0
     sonar_result = 'NA'
+    his_dir_map = config_dir_map([])
+    his_order = ''
+
+    my_dir_map = config_dir_map([])
+    my_order = {'in' : '', 'out' : ''}
     while True :
 
         x, y, my_life, opp_life, torpedo_cooldown, sonar_cooldown, silence_cooldown, mine_cooldown = [int(i) for i in input().split()]
         my_position = (x,y)
         sonar_result = sonar_result, input()
+        his_order = input()
 
-        his_dir_map = manage_order(lap, input(), his_dir_map, play_map, sonar_result)
+        his_dir_map = manage_order(lap, his_order, his_dir_map, play_map, sonar_result)
 
-        direction = dir_converter( my_dir_map['dir'][lap][0] )
+        my_order = decision(play_map, my_position, my_dir_map, his_dir_map)
 
-        sonar_result = 0 if sonar_result else 'NA' # put here sector if make sonar research
-        print(f'MOVE {direction} SILENCE')
+        """
+        direction = dir_converter( start_dir_map['dir'][lap][0] )
+        my_order['in'] = f'MOVE {direction} SILENCE'
+        my_order['out'] = f'MOVE {direction}'
+        """
+
+        my_dir_map = manage_order(lap, my_order['out'], my_dir_map, play_map)
+        print(my_order['in'])
+
         lap += 1
 
 def main():
     start_laps = 24 # == lenght_path
     play_map = config_play_map()
-    start_tile, my_dir_map = start(play_map, start_laps) 
-    his_dir_map = config_dir_map([])
+    start_tile, start_dir_map = start(play_map, start_laps) 
     print(*start_tile, sep = ' ')
-    game_loop(my_dir_map, his_dir_map, play_map)  
+    game_loop(start_dir_map, play_map)  
 
 if __name__ == '__main__' : main()
