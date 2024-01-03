@@ -65,12 +65,21 @@ def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
 
 from random import choice
 from random import choices
+from random import randrange
 from time import perf_counter
-from math import log10
+from math import log
 import copy
 
 def add_tuple (tuple_1, tuple_2) :
     return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
+
+def dir_tile_converter(direction_path, start_tile=(0,0)) :
+    tile_path = [start_tile]
+    current_tile = start_tile
+    for current_direction in direction_path :
+        current_tile = add_tuple(current_tile, current_direction[0])
+        tile_path.append(current_tile)
+    return tile_path
 
 # play_map
 
@@ -125,18 +134,18 @@ def dir_converter(key) :
     return dir_dic[key]
 
 # start_tile
- 
-def random_path(lenght,size) :
+
+def random_path(initial_direction_path,lenght,size) :
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
     while True :
         current_direction_path = []
-        current_tile = (size,size)
-        current_tile_path = [current_tile]
-        temp_direction_path = []
+        temp_direction_path = initial_direction_path
         temp_direction = [(0,0)]
+        start_tile = (size,size)
+        current_tile_path = dir_tile_converter(initial_direction_path, start_tile)
+        current_tile = current_tile_path[-1]
         counter = 0
         while True :
-            # temp_direction = choice(direction)
             reverse_tp_dir = [(temp_direction[0][0]*-1, temp_direction[0][1]*-1)]
             
             weight_direction = [2 if cursor == temp_direction 
@@ -157,7 +166,8 @@ def random_path(lenght,size) :
                 temp_direction_path.pop(-1)
                 counter += 1
                 if counter <= 6 : continue
-                else : break
+                else : 
+                    if current_direction_path : return config_dir_map(current_direction_path)
 
 # game_loop : orders
 
@@ -292,9 +302,13 @@ def stop(fork_map) :
         list(fork_map['fork'].values()) == list(fork_map['max'].values())) :
         return True
     else : return False
+    
 # game reading 
 
-def scatter_value(possible_path) :
+def length_value(path, ref_length) : # nouveau
+    return round( log(path['length'], ref_length), 2)
+
+def scatter_value(possible_path) : # nouveau
     next_tiles = [(x,y) for x in range(-1,2) for y in range(-1,2) if (x,y) != (0,0)]
     scatter = 0
     sector_list = []
@@ -309,10 +323,45 @@ def scatter_value(possible_path) :
                 if possible_path[cursor] == 1 : count += 1
             scatter += (1 - (0.1 * count)) if count >= 2 else 1
     nb_sector = len(set(sector_list))
-    scatter = round ( scatter * log10(nb_sector + 1) )
+    scatter = round ( scatter * log(nb_sector + 1, 10), 2)
     return scatter
             
 # main engine
+
+def path_map(current_path,play_map, length) : # nouveau
+    "debut de fonction (app)"
+    best_value, value, try_ = 0, 0, 0
+    possible_path,  random_dir_map = [], []
+
+    while try_ < 100 :
+        current_random_dir_map = random_path(current_path,length['max'],play_map['size'])
+        """
+        current_random_dir_map = [[(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)],
+                                  [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(0,1)], [(0,1)]]
+        current_random_dir_map = config_dir_map(current_random_dir_map)
+        current_possible_path = run_map( play_map,
+                                 current_random_dir_map,
+                                 command = 'start tile')
+        """
+        current_possible_path = run_map( play_map,
+                                 current_random_dir_map)
+        value = scatter_value(current_possible_path) * length_value(current_random_dir_map,length['ref'])
+        if value > best_value :
+            best_value = value
+            possible_path  = [current_possible_path]
+            random_dir_map = [current_random_dir_map]
+        elif value == best_value :
+            possible_path.append(current_possible_path)
+            random_dir_map.append(current_random_dir_map)
+        print(best_value, try_)
+        try_ += 1
+    
+    idx = randrange(len(possible_path))
+    possible_path = possible_path[idx]
+    random_dir_map = random_dir_map[idx]
+    show_map(possible_path, play_map)
+    show_path(random_dir_map['dir'])
+    return possible_path
 
 def run_map(play_map, dir_map, init_fork_map ={'fork':{}}, command ='gameloop') :
     # integrer dans un run map un filtre ('max_NS','max_EW')
@@ -356,39 +405,10 @@ def run_path(tile, play_map, dir_map, fork_map) :
 
 # game
 
-def start(play_map, start_laps) :
-    "debut de fonction (app)"
-    best_scatter, scatter, try_ = 0, 0, 0
-    possible_path,  random_dir_map = [], []
-
-    while try_ < 100 :
-        current_random_dir_map = random_path(start_laps,play_map['size'])
-        """
-        current_random_dir_map = [[(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)],
-                                  [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(0,1)], [(0,1)]]
-        current_random_dir_map = config_dir_map(current_random_dir_map)
-        current_possible_path = run_map( play_map,
-                                 current_random_dir_map,
-                                 command = 'start tile')
-        """
-        current_possible_path = run_map( play_map,
-                                 current_random_dir_map)
-        scatter = scatter_value(current_possible_path)
-        if scatter > best_scatter :
-            best_scatter = scatter
-            possible_path  = [current_possible_path]
-            random_dir_map = [current_random_dir_map]
-        elif scatter == best_scatter :
-            possible_path.append(current_possible_path)
-            random_dir_map.append(current_random_dir_map)
-        print(best_scatter, try_)
-        try_ += 1
-    "fin de fonction"
-    possible_path = choice(possible_path)
-    show_map(possible_path, play_map)
+def start(play_map, length) : # nouveau
+    possible_path = path_map([],play_map, length)
     start_tile = choice( [key for key in possible_path if possible_path[key] > 0] )
     return start_tile
-
 
 def game_loop(play_map) :
     lap = 0
@@ -403,17 +423,17 @@ def game_loop(play_map) :
         sonar_result = sonar_result, input()
         """
         
-        his_dir_map = manage_order(lap, input(), his_dir_map, play_map, sonar_result)
+        #his_dir_map = manage_order(lap, input(), his_dir_map, play_map, sonar_result)
 
-        direction = dir_converter( my_dir_map['dir'][lap][0] )
+        #direction = dir_converter( my_dir_map['dir'][lap][0] )
 
-        lap += 1
-
-
+        lap += tuple_1
+        return ### nouveau
+        
 def main():
-    start_laps = 24 # == lenght_path
+    length = {'ref' : 16, 'max' : 24} # == lenght_path
     play_map = config_play_map()
-    start_tile = start(play_map, start_laps) 
+    start_tile = start(play_map, length) 
     
     print(*start_tile, sep = ' ')
     # game_loop(my_dir_map, his_dir_map, play_map)  
