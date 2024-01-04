@@ -1,4 +1,3 @@
-
 # debug
 
 def show_map(content, play_map) :
@@ -10,7 +9,7 @@ def show_map(content, play_map) :
             except KeyError : line.append('XX')
         print(*line, sep=' ')   
 
-def show_path(path):
+def debug_path(path, show_path = False):
     tile_cursor = (0,0)
     path_cursor = [tile_cursor]
     for direction in path :
@@ -24,14 +23,18 @@ def show_path(path):
     path_cursor = { key : value for value,key in enumerate(path_cursor) }
     max_x = max([xy[0] for xy in path_cursor])
     max_y = max([xy[1] for xy in path_cursor])
+    spread = abs(max_x - min_x) * abs(max_y - min_y)
     
-    for y in range(max_y + 1) :
-        line = []
-        for x in range(max_x + 1) :
-            if (x,y) in path_cursor :
-                line.append(f'{path_cursor[(x,y)]:02}')
-            else : line.append('__')
-        print(*line, sep=' ')
+    if show_path == True :
+        for y in range(max_y + 1) :
+            line = []
+            for x in range(max_x + 1) :
+                if (x,y) in path_cursor :
+                    line.append(f'{path_cursor[(x,y)]:02}')
+                else : line.append('__')
+            print(*line, sep=' ')
+        print(spread)
+    else : return spread
 
 def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
         """ position in debug line:
@@ -66,27 +69,30 @@ def debug_built_path_process(play_map, parameters, num_test = 50) : # nouveau
     import statistics as stat
     current_path = []
     count = 0
-    path_length, path_value, process_time, swing_turn = [], [], [], []
+    path_length, path_value, process_time, swing_turn, path_spread = [], [], [], [], []
     while count != num_test :
-        start_time = perf_counter()
-        length, value, turn = path_map(current_path,play_map, parameters, test = True)
-        time = perf_counter() - start_time
+        rand_path, value, turn, time = path_map(current_path,play_map, parameters, start = True, test = True)
+        length = len(rand_path)
+        spread = debug_path(rand_path)
         path_length.append(length)
         path_value.append(value)
         process_time.append(time)
         swing_turn.append(turn)
+        path_spread.append(spread)
         count += 1
 
     print(*[(f' length : {round(stat.mean(path_length),2) , round(stat.pstdev(path_length),2)}' ),
             (f' value  : {round(stat.mean(path_value),2)  , round(stat.pstdev(path_value),2)}'  ),
             (f' time   : {round(stat.mean(process_time),2), round(stat.pstdev(process_time),2)}'),
             (f' turn   : {round(stat.mean(swing_turn),2)  , round(stat.pstdev(swing_turn),2)}'  ),
+            (f' spread : {round(stat.mean(path_spread),2) , round(stat.pstdev(path_spread),2)}' ),
            ], sep = '\n'
          )
     plt.plot(path_length)
     plt.plot(path_value)
     plt.plot(process_time)
     plt.plot(swing_turn)
+    plt.plot(path_spread)
 
 # tools
 
@@ -174,10 +180,12 @@ def random_path(initial_direction_path,lenght,size) :
         counter = 0
         while True :
             reverse_tp_dir = [(temp_direction[0][0]*-1, temp_direction[0][1]*-1)]
-            
-            weight_direction = [2 if cursor == temp_direction 
+            """
+            weight_direction = [1 if cursor == temp_direction 
                                   else 0 if cursor == reverse_tp_dir 
                                          else 0.25                      for cursor in direction ]
+            """
+            weight_direction = [0.25, 0.25, 0.25, 0.25]
             temp_direction = choices(direction, weight_direction)[0]
             temp_tile = add_tuple(current_tile,temp_direction[0])
             temp_direction_path.append(temp_direction)
@@ -354,13 +362,21 @@ def scatter_value(possible_path) : # nouveau
             
 # main engine
 
-def path_map(current_path,play_map, parameters, test = False) : # nouveau
+def path_map(current_path,play_map, parameters, start = False, test = False) : # nouveau
     "debut de fonction (app)"
-    best_value, value, try_, swing_turn = 0, 0, 0, 0
+    best_value, value, try_, swing_turn, swing_time = 0, 0, 0, 0, 0
     possible_path,  random_dir_map = [], []
-
-    while try_ < 150 :
-        current_random_dir_map = random_path(current_path,parameters['max_length'],play_map['size'])
+    start_time, time = perf_counter(), 0
+    max_time = parameters['start_time'] if start == True else parameters['turn_time']
+    while time < max_time :
+        ratio = False
+        while ratio == False :
+            current_random_dir_map = random_path(current_path,parameters['max_length'],play_map['size'])
+            length_ratio = len(current_random_dir_map) / parameters['ref_length']
+            time = perf_counter() - start_time
+            time_ratio = time / max_time
+            ratio = length_ratio > time_ratio  
+            if time >= max_time : break
         """
         current_random_dir_map = [[(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)],
                                   [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(0,1)], [(0,1)]]
@@ -374,12 +390,14 @@ def path_map(current_path,play_map, parameters, test = False) : # nouveau
         value = round( scatter_value(current_possible_path) * length_value(current_random_dir_map,parameters['ref_length']), 2)
         if value > best_value :
             swing_turn = try_
+            swing_time = time
             best_value = value
             possible_path  = [current_possible_path]
             random_dir_map = [current_random_dir_map]
         elif value == best_value :
             possible_path.append(current_possible_path)
             random_dir_map.append(current_random_dir_map)
+        time = perf_counter() - start_time
         try_ += 1
     
     idx = randrange(len(possible_path))
@@ -388,7 +406,7 @@ def path_map(current_path,play_map, parameters, test = False) : # nouveau
     # show_map(possible_path, play_map)
     # show_path(random_dir_map['dir'])
     if test == False : return possible_path
-    else : return len(random_dir_map['dir']), best_value, swing_turn
+    else : return random_dir_map['dir'], best_value, swing_turn, swing_time
 
 def run_map(play_map, dir_map, init_fork_map ={'fork':{}}, command ='gameloop') :
     # integrer dans un run map un filtre ('max_NS','max_EW')
@@ -400,7 +418,7 @@ def run_map(play_map, dir_map, init_fork_map ={'fork':{}}, command ='gameloop') 
     # if command == 'gameloop' : show_map(possible_path, play_map)
     return possible_path
 
-def run_path(tile, play_map, dir_map, fork_map) :
+def run_path(tile, play_map, dir_map, fork_map, start=True) :
     cursor = initial_cursor(dir_map, fork_map, tile)
     controller = {'blocking' : False,  'end_path' : False, 'stop' : True}
     possible_path = 0 # possible path for this tile
@@ -458,9 +476,9 @@ def game_loop(play_map) :
         return ### nouveau
         
 def main():
-    parameters = {'try_count' : 150, 'ref_length' : 16, 'max_length' : 24} # == lenght_path
+    parameters = {'start_time' : 0.8, 'turn_time' : 0.4, 'ref_length' : 16, 'max_length' : 24} # == lenght_path
     play_map = config_play_map()
-    debug_built_path_process(play_map, parameters, 10)
+    debug_built_path_process(play_map, parameters, 30)
     """
     start_time = perf_counter()
     start_tile = start(play_map, parameters) 
