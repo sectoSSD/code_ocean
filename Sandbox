@@ -1,7 +1,7 @@
 
 # debug
 
-def show_map(content, play_map) :
+def debug_map(content, play_map) :
     # give graphics overview of the value of each tiles, content is a dic with tuple (x,y) as key
     for y in range(play_map['size']):
         line = []
@@ -34,7 +34,6 @@ def debug_path(path, show_path = False):
                     line.append(f'{path_cursor[(x,y)]:02}')
                 else : line.append('__')
             print(*line, sep=' ')
-        print(spread)
     else : return spread
 
 def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
@@ -65,7 +64,7 @@ def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
         if r : print(r)
         else : pass
 
-def debug_built_path_process(play_map, parameters, num_test = 50) : # nouveau
+def debug_built_path_process(play_map, parameters, num_test) : # nouveau
     import matplotlib.pyplot as plt
     import statistics as stat
     current_path = []
@@ -100,12 +99,17 @@ def debug_built_path_process(play_map, parameters, num_test = 50) : # nouveau
 from random import choice
 from random import choices
 from random import randrange # nouveau ?
+from random import sample
 from time import perf_counter
 import math
 import copy
 
 def add_tuple (tuple_1, tuple_2) :
     return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
+
+def normal_law(x,s2,mu): # nouveau
+    sigma = math.sqrt(s2)     
+    return (1 / (sigma * math.sqrt(2 * math.pi))) * math.exp((-1 / 2) * (((x - mu)/sigma) ** 2))
 
 def dir_tile_converter(direction_path, start_tile=(0,0)) :
     tile_path = [start_tile]
@@ -117,22 +121,19 @@ def dir_tile_converter(direction_path, start_tile=(0,0)) :
 
 # play_map
 
-def config_play_map() :
-    """
-    width, height, my_id = [int(i) for i in input().split()]
-    size = width if width == height else 'problem'
-    island, brows = [], []
-    
-    for y in range(size):
-        line = input()
-        for x in range(size) :
-            if line[x] == 'x' : island.append((x,y))
-            else : brows.append((x,y))
-    """
-    size = 15
-    
-    island = [(14,14),(13,14),(14,13),(13,13),(7,7),(7,8),(8,7),(8,8),(14,3),(14,2),(13,3),(13,2)]
-    brows = [(x,y) for y in range(size) for x in range(size) if (x,y) not in island]
+def config_play_map(simulator = False) : # nouveau
+    if simulator == False :
+        width, height, my_id = [int(i) for i in input().split()]
+        size = width if width == height else 'problem'
+    else : 
+        size = 15
+        weights = [normal_law(i,s2=2,mu=4) for i in range(11)] 
+        num_island = choices([i for i in range(11)], weights)
+        tiles = [(x,y) for x in range(size) for y in range(size)]
+        print(num_island)
+        island = sample(tiles, *num_island)
+        brows = [xy for xy in tiles if xy not in island]
+        print(island)
     return {'island' : island, 'size' : size, 'brows' : brows}
 
 # run path : map
@@ -186,8 +187,8 @@ def random_path(initial_direction_path,lenght,size) :
                                   else 0 if cursor == reverse_tp_dir 
                                          else 0.25                      for cursor in direction ]
             """
-            weight_direction = [0.25, 0.25, 0.25, 0.25]
-            temp_direction = choices(direction, weight_direction)[0]
+            
+            temp_direction = choice(direction)
             temp_tile = add_tuple(current_tile,temp_direction[0])
             temp_direction_path.append(temp_direction)
             if ( temp_tile not in current_tile_path 
@@ -405,8 +406,8 @@ def path_map(current_path,play_map, parameters, start = False, test = False) : #
     idx = randrange(len(possible_path))
     possible_path = possible_path[idx]
     random_dir_map = random_dir_map[idx]
-    # show_map(possible_path, play_map)
-    # show_path(random_dir_map['dir'])
+    # debug_map(possible_path, play_map)
+    debug_path(random_dir_map['dir'],show_path=True)
     if test == False : return possible_path
     else : return random_dir_map['dir'], best_value, swing_turn, swing_time
 
@@ -457,7 +458,7 @@ def start(play_map, parameters) : # nouveau
     start_tile = choice( [key for key in possible_path if possible_path[key] > 0] )
     return start_tile
 
-def game_loop(play_map) :
+def game_loop(play_map, simulator) : # nouveau
     lap = 0
     sonar_result = 'NA'
     his_dir_map = config_dir_map([])
@@ -469,25 +470,26 @@ def game_loop(play_map) :
         my_position = (x,y)
         sonar_result = sonar_result, input()
         """
-        # faire un générateur d'ordre pour lui et mois qui gére les emplacement précedents
+        # faire un générateur d'ordre pour lui et mois qui gére les emplacement 
+        # pour l'algo c'est le fait de vérifier la validité d'un ordre à partir d'une position
+        # précise qui est nouveau. Ca doit rentrer dans rando_path je pense. Modifier dir_path pour 
+        # mettre une clef 'tile_path' ?
         
         #his_dir_map = manage_order(lap, input(), his_dir_map, play_map, sonar_result)
 
         #direction = dir_converter( my_dir_map['dir'][lap][0] )
 
         lap += 1
-        return ### nouveau
+        return 
         
-def main():
+def main(simulator = False): ### nouveau
     parameters = {'start_time' : 0.8, 'turn_time' : 0.4, 'ref_length' : 16, 'max_length' : 24} # == lenght_path
-    play_map = config_play_map()
-    debug_built_path_process(play_map, parameters, 30)
-    """
+    play_map = config_play_map(simulator)
+    # debug_built_path_process(play_map, parameters, 30)
     start_time = perf_counter()
     start_tile = start(play_map, parameters) 
-    print(*start_tile, sep = ' ')
-    game_loop(my_dir_map, his_dir_map, play_map)  
-    """
+    # print(*start_tile, sep = ' ')
+    game_loop(play_map, simulator)  
 
-if __name__ == '__main__' : main()
 
+if __name__ == '__main__' : main(True)
