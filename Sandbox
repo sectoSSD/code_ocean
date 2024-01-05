@@ -1,3 +1,4 @@
+
 # debug
 
 def show_map(content, play_map) :
@@ -100,7 +101,7 @@ from random import choice
 from random import choices
 from random import randrange # nouveau ?
 from time import perf_counter
-from math import log
+import math
 import copy
 
 def add_tuple (tuple_1, tuple_2) :
@@ -339,8 +340,9 @@ def stop(fork_map) :
     
 # game reading 
 
-def length_value(path, ref_length) : # nouveau
-    return round( log(path['length'], ref_length), 2)
+def length_value(length, max_length) : # nouveau
+    coef = (math.pi / 2) / max_length
+    return round( math.sin(length*coef), 2)
 
 def scatter_value(possible_path) : # nouveau
     next_tiles = [(x,y) for x in range(-1,2) for y in range(-1,2) if (x,y) != (0,0)]
@@ -357,7 +359,7 @@ def scatter_value(possible_path) : # nouveau
                 if possible_path[cursor] == 1 : count += 1
             scatter += (1 - (0.1 * count)) if count >= 2 else 1
     nb_sector = len(set(sector_list))
-    scatter = round ( scatter * log(nb_sector + 1, 10), 2)
+    scatter = round ( scatter * math.log(nb_sector + 1, 10), 2)
     return scatter
             
 # main engine
@@ -372,7 +374,7 @@ def path_map(current_path,play_map, parameters, start = False, test = False) : #
         ratio = False
         while ratio == False :
             current_random_dir_map = random_path(current_path,parameters['max_length'],play_map['size'])
-            length_ratio = len(current_random_dir_map) / parameters['ref_length']
+            length_ratio = len(current_random_dir_map) / parameters['max_length']
             time = perf_counter() - start_time
             time_ratio = time / max_time
             ratio = length_ratio > time_ratio  
@@ -387,10 +389,10 @@ def path_map(current_path,play_map, parameters, start = False, test = False) : #
         """
         current_possible_path = run_map( play_map,
                                  current_random_dir_map)
-        value = round( scatter_value(current_possible_path) * length_value(current_random_dir_map,parameters['ref_length']), 2)
+        value = round( scatter_value(current_possible_path) * length_value(current_random_dir_map['length'],parameters['max_length']), 2)
         if value > best_value :
             swing_turn = try_
-            swing_time = time
+            swing_time = perf_counter() - start_time
             best_value = value
             possible_path  = [current_possible_path]
             random_dir_map = [current_random_dir_map]
@@ -467,6 +469,7 @@ def game_loop(play_map) :
         my_position = (x,y)
         sonar_result = sonar_result, input()
         """
+        # faire un générateur d'ordre pour lui et mois qui gére les emplacement précedents
         
         #his_dir_map = manage_order(lap, input(), his_dir_map, play_map, sonar_result)
 
@@ -487,3 +490,4 @@ def main():
     """
 
 if __name__ == '__main__' : main()
+
