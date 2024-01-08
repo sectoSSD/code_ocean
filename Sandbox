@@ -1,11 +1,10 @@
-
 # debug
 
-def debug_map(content, play_map) :
+def debug_map(content, game_map) :
     # give graphics overview of the value of each tiles, content is a dic with tuple (x,y) as key
-    for y in range(play_map['size']):
+    for y in range(game_map['size']):
         line = []
-        for x in range(play_map['size']):
+        for x in range(game_map['size']):
             try : line.append(f'{content[x,y]:02}')
             except KeyError : line.append('XX')
         print(*line, sep=' ')   
@@ -64,14 +63,14 @@ def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
         if r : print(r)
         else : pass
 
-def debug_built_path_process(play_map, parameters, num_test) : # nouveau
+def debug_built_path_process(game_map, parameters, num_test) : # nouveau
     import matplotlib.pyplot as plt
     import statistics as stat
-    current_path = []
+    current_path = config_play_map(position = game_map['brows'])
     count = 0
     path_length, path_value, process_time, swing_turn, path_spread = [], [], [], [], []
     while count != num_test :
-        rand_path, value, turn, time = path_map(current_path,play_map, parameters, start = True, test = True)
+        rand_path, value, turn, time = path_map(current_path, game_map, parameters)
         length = len(rand_path)
         spread = debug_path(rand_path)
         path_length.append(length)
@@ -119,14 +118,14 @@ def dir_tile_converter(direction_path, start_tile=(0,0)) :
         tile_path.append(current_tile)
     return tile_path
 
-# play_map
+# game_map
 
-def config_play_map(simulator = False) : # nouveau
-    if simulator == False :
+def config_game_map(parameters) : # nouveau
+    if parameters['test_mod'] == False :
         width, height, my_id = [int(i) for i in input().split()]
         size = width if width == height else 'problem'
     else : 
-        size = 15
+        size = parameters['size_map']
         weights = [normal_law(i,s2=2,mu=4) for i in range(11)] 
         num_island = choices([i for i in range(11)], weights)
         tiles = [(x,y) for x in range(size) for y in range(size)]
@@ -136,15 +135,36 @@ def config_play_map(simulator = False) : # nouveau
         print(island)
     return {'island' : island, 'size' : size, 'brows' : brows}
 
+def config_play_map(play_map  = None,
+                    dir_path  = [], 
+                    tile_path = [], 
+                    position  = [],
+                    sector    = {'in' : {}, 'out' : {}, 'tiles' : {}} ### nouveau : avant : config_dir_map
+                   ) :
+    if play_map :
+        if not dir_path  : dir_path  = play_map['dir']
+        if not tile_path : tile_path = play_map['last_tiles'] 
+        if not position  : position  = play_map['position']
+        if not sector    : sector    = play_map['sector'] ### sector est bien maj en bloc ???
+    play_map = {
+                'dir'          : dir_path , 
+                'last_tiles'   : tile_path,
+                'position'     : position,
+                'max'          : (
+                                  sum([xy[0][0] for xy in dir_path if len(xy) == 1]) ,
+                                  sum([xy[0][1] for xy in dir_path if len(xy) == 1]) 
+                                 ), 
+                'length'       : len(dir_path),
+                'fork'         : [idx for idx in range(len(dir_path)) if len(dir_path[idx]) != 1],
+                'sector'       : sector
+               }
+    if play_map['position'] not in play_map['last_tiles'] : play_map['last_tiles'].append(play_map['position'])
+    return play_map
+
 # run path : map
 
 def off_side_max(max_, size) :
     e_w, n_s = max_
-    return (e_w not in range(0,size) or n_s not in range(0,size))
-
-def off_side_path(path, size) :
-    e_w = sum([xy[0][0] for xy in path if len(xy) == 1])
-    n_s = sum([xy[0][1] for xy in path if len(xy) == 1])
     return (e_w not in range(0,size) or n_s not in range(0,size))
 
 def off_side_tile (tile, size) :
@@ -170,44 +190,40 @@ def dir_converter(key) :
 
 # start_tile
 
-def random_path(initial_direction_path,lenght,size) :
+def random_path(initial_play_map, game_map, parameters) : # nouveau
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
     while True :
-        current_direction_path = []
-        temp_direction_path = copy.deepcopy(initial_direction_path)
         temp_direction = [(0,0)]
-        start_tile = (size,size)
-        current_tile_path = dir_tile_converter(initial_direction_path, start_tile)
-        current_tile = current_tile_path[-1]
+        first_direction = None
         counter = 0
+        current_direction_path = copy.deepcopy(initial_play_map['dir'])
+        current_tile = choice(initial_play_map['position'])
+        current_tile_path = (
+                              copy.deepcopy(initial_play_map['last_tiles']) 
+                              if parameters['status'] != 'me'
+                              else dir_tile_converter(initial_play_map['dir'], current_tile)
+                            )
         while True :
-            reverse_tp_dir = [(temp_direction[0][0]*-1, temp_direction[0][1]*-1)]
-            """
-            weight_direction = [1 if cursor == temp_direction 
-                                  else 0 if cursor == reverse_tp_dir 
-                                         else 0.25                      for cursor in direction ]
-            """
-            
             temp_direction = choice(direction)
             temp_tile = add_tuple(current_tile,temp_direction[0])
-            temp_direction_path.append(temp_direction)
-            if ( temp_tile not in current_tile_path 
-                 and off_side_path(temp_direction_path, size) == False ):
+            if temp_tile not in current_tile_path and blocking(temp_tile, game_map) == False :
+                if first_direction == None : first_direction = temp_direction
+                current_direction_path.append(temp_direction)
                 current_tile = temp_tile
-                current_direction_path = temp_direction_path
                 current_tile_path.append(current_tile)
-                if len(current_direction_path) == lenght : 
-                    return config_dir_map(current_direction_path)
                 counter = 0
+                if len(current_direction_path) == parameters['max_length'] : 
+                    return current_direction_path, first_direction
             else :
-                temp_direction_path.pop(-1)
                 counter += 1
-                if counter > 6 and current_direction_path : 
-                    return config_dir_map(current_direction_path)
+                if counter > 6 and first_direction != None : 
+                    return current_direction_path, first_direction
+                elif counter > 6 : break
+        
 
 # game_loop : orders
 
-def torpedo_area(center, play_map) :
+def torpedo_area(center, game_map) :
     ref_position = center
     current_position = ref_position
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
@@ -219,7 +235,7 @@ def torpedo_area(center, play_map) :
         range_ += 1
         current_direction = choice(direction)
         current_position = add_tuple(current_position,current_direction[0])
-        if blocking(current_position, play_map) :
+        if blocking(current_position, game_map) :
             current_position = ref_position
             range_ = 0
             continue
@@ -233,67 +249,57 @@ def torpedo_area(center, play_map) :
             range_ = 0
         if try_ == max_try or len(torpedo_area) == 40 : return torpedo_area
 
-def manage_order(index, order, dir_map, play_map, sonar_result) :
+def manage_order(index, order, play_map, game_map, sonar_result) :
     message_order = [cursor.split() for cursor in order.split('|')]
     for order_cursor in message_order :
-        if order_cursor[0] == 'MOVE' : dir_map['dir'].append( dir_converter(order_cursor[1]) )
-        elif order_cursor[0] == 'SILENCE' : dir_map['dir'].append(dir_converter('silence'))
+        if order_cursor[0] == 'MOVE' : play_map['dir'].append( dir_converter(order_cursor[1]) )
+        elif order_cursor[0] == 'SILENCE' : play_map['dir'].append(dir_converter('silence'))
         elif (order_cursor[0] == 'SURFACE' or order_cursor[0] == 'SONAR'
-           ) : dir_map['sector']['in'][index] = order_cursor[1]
+             ) : play_map['sector']['in'][index] = order_cursor[1]
         elif order_cursor[0] == 'TORPEDO' :
             shoot_tile = order_cursor[1], order_cursor[2]
-            dir_map['sector']['tiles'][index] = torpedo_area(shoot_tile, play_map)
+            play_map['sector']['tiles'][index] = torpedo_area(shoot_tile, game_map)
         if 'NA' not in sonar_result : 
-            if   sonar_result[1] == 'Y' : dir_map['sector']['in'][index - 1] = sonar_result[0]
-            elif sonar_result[1] == 'N' : dir_map['sector']['out'][index - 1] = sonar_result[0]
-    return config_dir_map(dir_map['dir'], dir_map['sector'])
+            if   sonar_result[1] == 'Y' : play_map['sector']['in'][index - 1] = sonar_result[0]
+            elif sonar_result[1] == 'N' : play_map['sector']['out'][index - 1] = sonar_result[0]
+    return config_play_map(play_map, dir_path = play_map['dir'], sector = play_map['sector']) ### A REVOIR
 
 # run path : cursor
 
-def initial_cursor(dir_map, fork_map, tile) :
-    # 'dir' : current position in dir_map
-    # 'idx' : current index in dir_map
+def initial_cursor(play_map, fork_map, tile) :
+    # 'dir' : current position in play_map
+    # 'idx' : current index in play_map
     # 'fork' : least embranchement '' if no fork
     # 'tile' : current tile on map
     init_cursor = {'dir' : (), 'idx' : 0, 'tile' : () }
-    
-    init_cursor['dir'] = ( dir_map['dir'][0][fork_map['fork'][0]-1] 
+    init_cursor['dir'] = ( 
+                          play_map['dir'][0][fork_map['fork'][0]-1] 
                           if fork_map['fork'].get(0) != None
-                          else dir_map['dir'][0][0])
+                          else play_map['dir'][0][0]
+                         )
     init_cursor['tile'] = add_tuple(tile, init_cursor['dir'])
     return init_cursor
 
-def update_cursor (cursor, dir_map, fork_map) :
+def update_cursor (cursor, play_map, fork_map) :
     cursor['idx'] += 1
-    branch_index = ( fork_map['fork'][cursor['idx']] 
-                    
-                            if fork_map['fork'].get(cursor['idx']) != None
-                            else 0 )
-    
-    cursor['dir'] = dir_map['dir'][ cursor['idx'] ] [branch_index]
+    branch_index = ( 
+                    fork_map['fork'][cursor['idx']] 
+                    if fork_map['fork'].get(cursor['idx']) != None
+                    else 0 
+                   )
+    cursor['dir'] = play_map['dir'][ cursor['idx'] ] [branch_index]
     cursor['tile'] = add_tuple(cursor['tile'], cursor['dir'])
     return cursor
 
-# run_path : dir_map
-
-def config_dir_map(dir_path, sector = {'in' : {}, 'out' : {}, 'tiles' : {}} ) :
-    return     {'dir' : dir_path , 
-               'max' :  ( sum([xy[0][0] for xy in dir_path if len(xy) == 1]) ,
-                          sum([xy[0][1] for xy in dir_path if len(xy) == 1]) ), 
-               'length' : len(dir_path),
-               'fork'   : [idx for idx in range(len(dir_path)) if len(dir_path[idx]) != 1],
-               'sector' : sector
-                }
-
 # run_path : fork_map
             
-def config_fork_map (dir_map) :
+def config_fork_map (play_map) :
     # how fork_map is built :
     fork_map = {'fork' : {}, 'max' : {}, 'fork-index': {}, 'index-fork' : {}}
     index = 0
-    for fork in dir_map['fork'] :
+    for fork in play_map['fork'] :
         fork_map['fork'][fork] = 0
-        fork_map['max'][fork] = len(dir_map['dir'][fork])
+        fork_map['max'][fork] = len(play_map['dir'][fork])
         fork_map['fork-index'][fork] = index
         fork_map['index-fork'][index] = fork
         index += 1
@@ -319,10 +325,10 @@ def update_fork_map(fork, fork_map):
 
 # run_path : controller
 
-def blocking(tile, play_map, sector = {}, index = None) : # revoir : sector_map
+def blocking(tile, game_map, sector = {'in' : {}, 'out' : {}, 'tiles' : {}}, index = None) : # revoir : sector_map
     blocking = (    True 
-                    if tile in play_map['island'] 
-                    or off_side_tile(tile, play_map['size']) 
+                    if tile in game_map['island'] 
+                    or off_side_tile(tile, game_map['size']) 
                     or ( sector['in'].get(index) != None 
                             and sector['in'].get(index) != sector(tile) )
                     or ( sector['out'].get(index) != None
@@ -365,64 +371,62 @@ def scatter_value(possible_path) : # nouveau
             
 # main engine
 
-def path_map(current_path,play_map, parameters, start = False, test = False) : # nouveau
+def path_map(play_map, game_map, parameters) : # nouveau
     "debut de fonction (app)"
     best_value, value, try_, swing_turn, swing_time = 0, 0, 0, 0, 0
-    possible_path,  random_dir_map = [], []
+    possible_path = []
     start_time, time = perf_counter(), 0
-    max_time = parameters['start_time'] if start == True else parameters['turn_time']
+    max_time = parameters['start_time'] if parameters['status'] == 'start' else parameters['turn_time']
     while time < max_time :
         ratio = False
         while ratio == False :
-            current_random_dir_map = random_path(current_path,parameters['max_length'],play_map['size'])
+            current_random_dir_map, current_next_direction = random_path(play_map, game_map, parameters) ###
             length_ratio = len(current_random_dir_map) / parameters['max_length']
             time = perf_counter() - start_time
             time_ratio = time / max_time
             ratio = length_ratio > time_ratio  
             if time >= max_time : break
-        """
-        current_random_dir_map = [[(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)],
-                                  [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(1,0)], [(0,1)], [(0,1)]]
-        current_random_dir_map = config_dir_map(current_random_dir_map)
-        current_possible_path = run_map( play_map,
-                                 current_random_dir_map,
-                                 command = 'start tile')
-        """
-        current_possible_path = run_map( play_map,
-                                 current_random_dir_map)
-        value = round( scatter_value(current_possible_path) * length_value(current_random_dir_map['length'],parameters['max_length']), 2)
+        current_random_play_map = config_play_map(play_map, dir_path = current_random_dir_map)
+        current_possible_path   = run_map( game_map, current_random_play_map)
+        value = round( scatter_value(current_possible_path) * length_value(current_random_play_map['length'],parameters['max_length']), 2)
         if value > best_value :
             swing_turn = try_
             swing_time = perf_counter() - start_time
             best_value = value
             possible_path  = [current_possible_path]
-            random_dir_map = [current_random_dir_map]
+            random_play_map = [current_random_play_map]
+            next_direction = [current_next_direction]
         elif value == best_value :
             possible_path.append(current_possible_path)
-            random_dir_map.append(current_random_dir_map)
+            random_play_map.append(current_random_play_map)
+            next_direction.append(current_next_direction)
         time = perf_counter() - start_time
         try_ += 1
     
     idx = randrange(len(possible_path))
     possible_path = possible_path[idx]
-    random_dir_map = random_dir_map[idx]
-    # debug_map(possible_path, play_map)
-    debug_path(random_dir_map['dir'],show_path=True)
-    if test == False : return possible_path
-    else : return random_dir_map['dir'], best_value, swing_turn, swing_time
+    random_play_map = random_play_map[idx]
+    next_direction = next_direction[idx]
+    # debug_map(possible_path, game_map)
+    # debug_path(random_play_map['dir'],show_path=True)
+    ###
+    if   parameters['test_mod'] == False and parameters['status'] == 'start' : return possible_path
+    elif parameters['test_mod'] == False and parameters['status'] == 'me' : return possible_path, next_direction  
+    else : return random_play_map['dir'], best_value, swing_turn, swing_time
+    ###
 
-def run_map(play_map, dir_map, init_fork_map ={'fork':{}}, command ='gameloop') :
+def run_map(game_map, play_map, init_fork_map ={'fork':{}}, command ='gameloop') :
     # integrer dans un run map un filtre ('max_NS','max_EW')
     possible_path = {}
-    for tile in play_map['brows'] :
-        #if off_side_max( add_tuple(tile, dir_map['max']), play_map['size']) : continue
+    for tile in game_map['brows'] :
+        #if off_side_max( add_tuple(tile, play_map['max']), game_map['size']) : continue
         fork_map = copy.deepcopy(init_fork_map)
-        possible_path[tile] = run_path(tile, play_map, dir_map, fork_map)     
-    # if command == 'gameloop' : show_map(possible_path, play_map)
+        possible_path[tile] = run_path(tile, game_map, play_map, fork_map)     
+    # if command == 'gameloop' : show_map(possible_path, game_map)
     return possible_path
 
-def run_path(tile, play_map, dir_map, fork_map, start=True) :
-    cursor = initial_cursor(dir_map, fork_map, tile)
+def run_path(tile, game_map, play_map, fork_map, start=True) :
+    cursor = initial_cursor(play_map, fork_map, tile)
     controller = {'blocking' : False,  'end_path' : False, 'stop' : True}
     possible_path = 0 # possible path for this tile
     
@@ -433,9 +437,9 @@ def run_path(tile, play_map, dir_map, fork_map, start=True) :
             fork_map = update_fork_map(cursor['idx'], fork_map)
             controller['stop'] = stop(fork_map)
         "B : obstacle : " 
-        controller['blocking'] = blocking(cursor['tile'], play_map, dir_map['sector'], cursor['idx'])
+        controller['blocking'] = blocking(cursor['tile'], game_map, play_map['sector'], cursor['idx'])
         "C : bout de path : " 
-        controller['end_path'] = True if cursor['idx'] == dir_map['length'] - 1 else False
+        controller['end_path'] = True if cursor['idx'] == play_map['length'] - 1 else False
 
         # debug_run_path(controller, cursor, fork_map, tile) # DEBUG MOD
             
@@ -443,26 +447,27 @@ def run_path(tile, play_map, dir_map, fork_map, start=True) :
         
         if controller['stop'] == False :
             if controller['blocking'] == True or controller['end_path'] == True :
-                cursor = initial_cursor(dir_map, fork_map, tile)
+                cursor = initial_cursor(play_map, fork_map, tile)
                 continue
         else :
             if controller['blocking'] == True or controller['end_path'] == True :
                 return possible_path
         
-        cursor = update_cursor(cursor, dir_map, fork_map)
+        cursor = update_cursor(cursor, play_map, fork_map)
 
 # game
 
-def start(play_map, parameters) : # nouveau
-    possible_path = path_map([],play_map, parameters)
+def start(game_map, parameters) : # nouveau
+    start_play_map = config_play_map(position = game_map['brows'])
+    possible_path = path_map(start_play_map,game_map, parameters)
     start_tile = choice( [key for key in possible_path if possible_path[key] > 0] )
     return start_tile
 
-def game_loop(play_map, simulator) : # nouveau
+def game_loop(game_map, parameters) : # nouveau
     lap = 0
     sonar_result = 'NA'
-    his_dir_map = config_dir_map([])
-    my_dir_map = config_dir_map([])
+    his_play_map = config_play_map()
+    my_play_map  = config_play_map()
     
     while True :
         """
@@ -470,26 +475,31 @@ def game_loop(play_map, simulator) : # nouveau
         my_position = (x,y)
         sonar_result = sonar_result, input()
         """
-        # faire un générateur d'ordre pour lui et mois qui gére les emplacement 
-        # pour l'algo c'est le fait de vérifier la validité d'un ordre à partir d'une position
-        # précise qui est nouveau. Ca doit rentrer dans rando_path je pense. Modifier dir_path pour 
-        # mettre une clef 'tile_path' ?
         
-        #his_dir_map = manage_order(lap, input(), his_dir_map, play_map, sonar_result)
+        # random_path _> play_map['current_tile] continuer
+        
+        #his_play_map = manage_order(lap, input(), his_play_map, game_map, sonar_result)
 
-        #direction = dir_converter( my_dir_map['dir'][lap][0] )
+        #direction = dir_converter( my_play_map['dir'][lap][0] )
 
         lap += 1
         return 
         
-def main(simulator = False): ### nouveau
-    parameters = {'start_time' : 0.8, 'turn_time' : 0.4, 'ref_length' : 16, 'max_length' : 24} # == lenght_path
-    play_map = config_play_map(simulator)
-    # debug_built_path_process(play_map, parameters, 30)
+def main(): ### nouveau
+    parameters = {
+                    'test_mod'   : True,
+                    'status'     : 'start',
+                    'start_time' : 0.8, 
+                    'turn_time'  : 0.4, 
+                    'ref_length' : 16, 
+                    'max_length' : 24,
+                    'size_map'   : 15
+                 }
+    game_map = config_game_map(parameters)
+    debug_built_path_process(game_map, parameters, 30)
     start_time = perf_counter()
-    start_tile = start(play_map, parameters) 
+    start_tile = start(game_map, parameters) 
     # print(*start_tile, sep = ' ')
-    game_loop(play_map, simulator)  
+    game_loop(game_map, parameters)  
 
-
-if __name__ == '__main__' : main(True)
+if __name__ == '__main__' : main()
