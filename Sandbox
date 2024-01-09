@@ -97,11 +97,23 @@ def debug_built_path_process(game_map, parameters, num_test) : # nouveau
             (f' spread : {round(stat.mean(path_spread),2) , round(stat.pstdev(path_spread),2)}' ),
            ], sep = '\n'
          )
-    plt.plot(path_length)
-    plt.plot(path_value)
-    plt.plot(process_time)
-    plt.plot(swing_turn)
-    plt.plot(path_spread)
+    turn = list(range(num_test))
+    c11 = 'tab:red'
+    c12 = 'tab:orange'
+    c13 = 'tab:pink'
+    c21 = 'tab:blue'
+    c22 = 'tab:cyan'
+    c23 = 'tab:purple'
+    fig, ax1 = plt.subplots(layout='constrained')
+    ax1.plot(turn, path_value, color=c11)
+    ax1.plot(turn, process_time, color=c12)
+    ax1.tick_params(axis='y', labelcolor=c13)
+    
+    ax2 = ax1.twinx()
+    ax2.plot(turn, path_length, color=c21)
+    ax2.plot(turn, swing_turn, color=c22)
+    ax2.plot(turn, path_spread, color=c23)
+    plt.show()
 
 # tools
 
@@ -131,10 +143,8 @@ def config_game_map(parameters) : # nouveau
         weights = [normal_law(i,s2=2,mu=4) for i in range(11)] 
         num_island = choices([i for i in range(11)], weights)
         tiles = [(x,y) for x in range(size) for y in range(size)]
-        print(num_island)
         island = sample(tiles, *num_island)
         brows = [xy for xy in tiles if xy not in island]
-        print(island)
     return {'island' : island, 'size' : size, 'brows' : brows}
 
 def config_play_map(play_map  = None,
@@ -395,7 +405,7 @@ def scatter(possible_path, length, max_length) : # nouveau
                 try : possible_path[cursor]
                 except KeyError : continue
                 if possible_path[cursor] == 1 : count += 1
-            spread_list.append(1 - (0.1 * count)) if count >= 2 else 1
+                spread_list.append(1 - (0.1 * count) if count >= 2 else 1)
     sector_value = math.log(len(set(sector_list)) + 1, 10)
     length_value = math.sin(length * (math.pi / 2) / max_length)
     spread_value = stat.mean(spread_list)
