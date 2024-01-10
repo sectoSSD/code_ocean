@@ -76,7 +76,7 @@ def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
 
 def debug_built_path_process(game_map, parameters, num_test) : # nouveau
     import matplotlib.pyplot as plt
-    current_path = config_play_map(position = game_map['brows'])
+    current_path = config_play_map(game_map, position = game_map['brows'])
     count = 0
     path_length, path_value, process_time, swing_turn, path_spread = [], [], [], [], []
     while count != num_test :
@@ -175,6 +175,12 @@ def stop(fork_map) :
 # map
 
 def config_game_map(parameters) : # nouveau
+    """
+    Représente the playground. It's a dictionnary containning three keys  :
+    island : list of island tiles
+    size : one integer which is the lenghth of the sides of the square
+    brows : free tiles where the submarine can move
+    """
     if parameters['test_mod'] == False :
         width, height, my_id = [int(i) for i in input().split()]
         size = width if width == height else 'problem'
@@ -187,7 +193,8 @@ def config_game_map(parameters) : # nouveau
         brows = [xy for xy in tiles if xy not in island]
     return {'island' : island, 'size' : size, 'brows' : brows}
 
-def config_play_map(play_map  = None,
+def config_play_map(game_map,
+                    play_map  = None,
                     dir_path  = [], 
                     tile_path = [], 
                     position  = [],
@@ -245,9 +252,23 @@ def config_play_map(play_map  = None,
                 'last_tiles'   : tile_path
                }
     if play_map['position'] not in play_map['last_tiles'] : play_map['last_tiles'].append(play_map['position'])
+    if not play_map['position'] : play_map[position] = game_map['brows']
     return play_map
 
-
+def config_target(game_map, my_play_map, his_play_map, parameters) :
+    'where are informations about balance of power beetween me and he'
+    my_scatter   = run_map(game_map, my_play_map)
+    my_position  = list(filter(lambda key : my_scatter[key] == 1, my_scatter))
+    his_scatter  = run_map(game_map, his_play_map)
+    his_position = list(filter(lambda key : his_scatter[key] == 1, his_scatter))
+    target = {
+              'my_scatter'  : my_scatter,
+              'my_position' : my_position,
+              'his_scatter' : his_scatter,
+              'his_postion' : his_position,
+              'coef'        : round( my_position / his_position, 2),
+             }
+    return target
 # next_tile
 
 def random_path(initial_play_map, game_map, parameters) : # nouveau
@@ -281,7 +302,7 @@ def random_path(initial_play_map, game_map, parameters) : # nouveau
                         return current_direction_path, first_direction
                     else : break
 
-def next_tile(play_map, game_map, parameters) : # nouveau
+def next_tile(play_map, game_map, target, parameters) : # nouveau
     "debut de fonction (app)"
     best_value, value, try_, swing_turn, swing_time = 0, 0, 0, 0, 0
     possible_path = []
@@ -297,15 +318,14 @@ def next_tile(play_map, game_map, parameters) : # nouveau
             ratio = length_ratio > time_ratio  
             if time >= max_time : break
         
-        current_random_play_map = config_play_map(play_map, dir_path = current_random_dir_map)
+        current_random_play_map = config_play_map(game_map, play_map, dir_path = current_random_dir_map)
         current_possible_path   = run_map( game_map, current_random_play_map)
         hiding_value = scatter(current_possible_path, 
                                current_random_play_map['length'], 
                                parameters['max_length'])
         hunting_value = hunting()
-        target = parameters['target']
         
-        value = round( (1-target) * hiding_value + target * hunting_value, 2)
+        value = round( (1-target['coef']) * hiding_value + target['coef'] * hunting_value, 2)
         
         if value > best_value :
             swing_turn = try_
@@ -329,7 +349,7 @@ def next_tile(play_map, game_map, parameters) : # nouveau
     debug_path(random_play_map['dir'],game_map, show_path=True)
     if parameters['test_mod'] == False :
         if parameters['status'] == 'start' : 
-            return choice( [key for key in possible_path if possible_path[key] > 0] )
+            return choice( list(filter(lambda key : possible_path[key] == 1, possible_path)) )
         else : return next_direction
     else : return random_play_map['dir'], best_value, swing_turn, swing_time
 
@@ -376,9 +396,10 @@ def manage_order(index, order, play_map, game_map, sonar_result) :
             elif sonar_result[1] == 'N' : play_map['sector']['out'][index - 1] = sonar_result[0]
         # creer une fonction ?
         possible_path = run_map(game_map, play_map)
-        play_map['position'] = [key for key in possible_path.values() if possible_path[key] == 1] 
+        play_map['position'] = [ list(filter(lambda key : possible_path[key] == 1, possible_path))] 
         # continuer
-    return config_play_map(play_map, 
+    return config_play_map(game_map,
+                           play_map, 
                            dir_path = play_map['dir'], 
                            position = play_map['position'],
                            sector = play_map['sector']) ### A REVOIR
@@ -514,15 +535,16 @@ def run_path(tile, game_map, play_map, fork_map, start=True) :
 # game
 
 def start(game_map, parameters) : # nouveau
-    start_play_map = config_play_map(position = game_map['brows'])
+    start_play_map = config_play_map(game_map)
     start_tile = next_tile(start_play_map,game_map, parameters)
     return start_tile
 
 def game_loop(game_map, parameters) : # nouveau
     lap = 0
     sonar_result = 'NA'
-    his_play_map = config_play_map()
-    my_play_map  = config_play_map()
+    his_play_map = config_play_map(game_map)
+    my_play_map  = config_play_map(game_map)
+    target = config_target()
     
     while True :
         if parameters['test_mod'] == False :
@@ -532,6 +554,7 @@ def game_loop(game_map, parameters) : # nouveau
         
         
         # reviser manage_order pour prise en compte des modi de play_map en particulier 'postions'
+        # continuer d'integrer play_map position
         his_play_map = manage_order(lap, input(), his_play_map, game_map, sonar_result)
 
         direction = dir_converter( my_play_map['dir'][lap][0] )
