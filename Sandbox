@@ -185,13 +185,14 @@ def config_game_map(parameters) : # nouveau
         width, height, my_id = [int(i) for i in input().split()]
         size = width if width == height else 'problem'
     else : 
+        my_id = choice([0,1])
         size = parameters['size_map']
         weights = [normal_law(i,s2=2,mu=4) for i in range(11)] 
         num_island = choices([i for i in range(11)], weights)
         tiles = [(x,y) for x in range(size) for y in range(size)]
         island = sample(tiles, *num_island)
         brows = [xy for xy in tiles if xy not in island]
-    return {'island' : island, 'size' : size, 'brows' : brows}
+    return {'island' : island, 'size' : size, 'brows' : brows, 'IA start' : bool(my_id)}
 
 def config_play_map(game_map,
                     play_map  = None,
@@ -395,7 +396,7 @@ def manage_order(index, order, play_map, game_map, sonar_result) :
             if   sonar_result[1] == 'Y' : play_map['sector']['in'][index - 1] = sonar_result[0]
             elif sonar_result[1] == 'N' : play_map['sector']['out'][index - 1] = sonar_result[0]
         # creer une fonction ?
-        possible_path = run_map(game_map, play_map)
+        . = run_map(game_map, play_map)
         play_map['position'] = [ list(filter(lambda key : possible_path[key] == 1, possible_path))] 
         # continuer
     return config_play_map(game_map,
@@ -536,7 +537,7 @@ def run_path(tile, game_map, play_map, fork_map, start=True) :
 
 def start(game_map, parameters) : # nouveau
     start_play_map = config_play_map(game_map)
-    start_tile = next_tile(start_play_map,game_map, parameters)
+    start_tile = next_tile(start_play_map,game_map, target = 0, parameters)
     return start_tile
 
 def game_loop(game_map, parameters) : # nouveau
@@ -544,7 +545,7 @@ def game_loop(game_map, parameters) : # nouveau
     sonar_result = 'NA'
     his_play_map = config_play_map(game_map)
     my_play_map  = config_play_map(game_map)
-    target = config_target()
+    
     
     while True :
         if parameters['test_mod'] == False :
@@ -552,20 +553,29 @@ def game_loop(game_map, parameters) : # nouveau
             my_position = (x,y)
             sonar_result = sonar_result, input()
         
+        if game_map['IA start'] :
+            his_play_map = manage_order(lap, input(), his_play_map, game_map, sonar_result)
+        elif game_map['IA_start'] == False and lap == 0 :
+            tile = next_tile(my_play_map, game_map, target = 0, parameters)
+            direction = dir_converter(tile)
+            print('MOVE {direction} TORPEDO')
+        else : 
+            target = config_target(game_map, my_play_map, his_play_map, parameters)
+            
         
-        # reviser manage_order pour prise en compte des modi de play_map en particulier 'postions'
-        # continuer d'integrer play_map position
-        his_play_map = manage_order(lap, input(), his_play_map, game_map, sonar_result)
-
         direction = dir_converter( my_play_map['dir'][lap][0] )
 
         lap += 1
         return 
-        
+    # suivre :
+        target
+        my_play_map
+        his_play_map
 def main(): ### nouveau
     parameters = {
                     'test_mod'   : True,      # to run the program on a console
                     'size_map'   : 15,        # default size of when we are in test mod
+                    'default_id' : 0          # i start if we are in test_mode
                     'status'     : 'start',   # 'start' at start and 'me' or 'he'in game loop
                     'start_time' : 0.8,       # how much time we can run next_tiles() at start
                     'turn_time'  : 0.4,       # how much time we can run next_tiles() in game_loop
