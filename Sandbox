@@ -262,19 +262,19 @@ def config_play_map(play_map  = None,
                   [(1,2),(1,1),(1,1),(0,0)] when following the 'dir' exemple above.
     """
     if play_map :
-        if not dir_path  : dir_path  = play_map['dir']
-        if not tile_path : tile_path = play_map['last_tiles'] 
-        if not position  : position  = play_map['position']
-        if not sector    : sector    = play_map['sector'] ### sector est bien maj en bloc ???
+        if not dir_path   : dir_path   = play_map['dir']
+        if not next_dir   : next_dir   = play_map['next_dir']
+        if not next_tile  : next_tile  = play_map['next_tile']
+        if not next_paths : next_paths = play_map['next_paths'] 
+        if not tile_path  : tile_path  = play_map['last_tiles'] 
+        if not position   : position   = play_map['position']
+        if not sector     : sector     = play_map['sector'] ### sector est bien maj en bloc ???
 
     play_map = {
                 'dir'          : dir_path , 
-                'next_dir'     : '_______',
-                'next_tile'    : '_______',
-                'next_paths'   : '_______',
-                # MAJ next_path automatiquement 
-                # suivre next_tile pour voir s'il est MAJ 
-                # fair un update_play_map pour pour est sur que play_map MAJ au bon moment ?
+                'next_dir'     : next_dir ,
+                'next_tile'    : next_tile,
+                'next_paths'   : next_paths,
                 'max'          : (
                                   sum([xy[0][0] for xy in dir_path if len(xy) == 1]) ,
                                   sum([xy[0][1] for xy in dir_path if len(xy) == 1]) 
