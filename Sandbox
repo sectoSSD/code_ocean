@@ -265,7 +265,6 @@ def stop(fork_map) :
 def config_play_map(play_map  = None,
                     dir_path  = [], 
                     next_dir  = [],
-                    next_tile = [],
                     next_paths = [],
                     tile_path = [], 
                     position  = [],
@@ -284,9 +283,7 @@ def config_play_map(play_map  = None,
                    'Silence' there is several tuples the list of list : [[(0,1)],[(0,1),(0,-1)]]
                    See 'dir_converter' function for all details.
     
-    'next_direction' : Next direction calculated by 'next_tile' function not yet in 'play_map['dir']'. 
-    
-    'next_tile' :   Next tile calculated by 'next_tile' function not yet in 'play_map[last_tiles]'.
+    'next_direction' : Next direction calculated by 'next_tile' function not yet in 'play_map['dir']'.
     
     'next_paths' : 'Next_tiles' function have few time to find à goog next tile for the submarine. Keeping
                    the best next_paths of the previus search in 'next_tiles' function ensure us to have a
@@ -320,7 +317,6 @@ def config_play_map(play_map  = None,
     if play_map :
         if not dir_path   : dir_path   = play_map['dir']
         if not next_dir   : next_dir   = play_map['next_direction']
-        if not next_tile  : next_tile  = play_map['next_tile']
         if not next_paths : next_paths = play_map['next_paths'] 
         if not tile_path  : tile_path  = play_map['last_tiles'] 
         if not position   : position   = play_map['position']
@@ -330,7 +326,6 @@ def config_play_map(play_map  = None,
     play_map = {
                 'dir'            : dir_path , 
                 'next_direction' : next_dir ,
-                'next_tile'      : next_tile,
                 'next_paths'     : next_paths,
                 'max'            : (
                                     sum([xy[0][0] for xy in dir_path if len(xy) == 1]) ,
@@ -361,19 +356,29 @@ def config_target(my_play_map = None, his_play_map = None, status = 'game loop')
     'where are informations about balance of power beetween me and he'
     if status == 'game_loop' and (my_play_map == None or his_play_map== None) : 
         raise Exception('lack play_map')
-    if status == 'game loop' :
-        my_scatter   = run_map(my_play_map)
+    if my_play_map['dir'] :
+        my_scatter   = run_map(my_play_map) 
         my_position  = list(filter(lambda key : my_scatter[key] == 1, my_scatter))
+        my_dilution = len(my_position)
+    else :
+        my_position = game_map['brows']
+        my_scatter = {key : 1 for key in game_map['brows']}
+        my_dilution = len(my_position)
+    if his_play_map['dir'] :
         his_scatter  = run_map(his_play_map)
         his_position = list(filter(lambda key : his_scatter[key] == 1, his_scatter))
-        target = {
-                  'my_scatter'  : my_scatter,
-                  'my_position' : my_position,
-                  'his_scatter' : his_scatter,
-                  'his_postion' : his_position,
-                  'coef'        : round( my_position / his_position, 2),
-                 }
-    else : target = {'coef' : 0}
+        his_dilution = len(his_position)
+    else :
+        his_position = game_map['brows']
+        his_scatter = {key : 1 for key in game_map['brows']}
+        his_dilution = len(his_position)
+    target = {
+              'my_scatter'  : my_scatter,
+              'my_position' : my_position,
+              'his_scatter' : his_scatter,
+              'his_postion' : his_position,
+              'coef'        : round( my_dilution / his_dilution, 2),
+             }
     return target
 
 # next_tile
@@ -424,27 +429,43 @@ def random_path(initial_play_map) : # nouveau
                         return current_direction_path, first_direction
                     else : break
 
-def best_random_path(play_map, target, status) :
-    best_value, try_, start_time, time = 0, 0, perf_counter(), 0
-    max_time = constant['start_time'] if status == 'start' else constant['turn_time']
-    max_length, min_value = 0, 0
-    best_values, possible_path, dir_path, next_direction = [], [], [], [], 
-    while time < max_time :
+def build_path(play_map, target, timer) :
+    if timer['start'] == True :
+        timer['start_time'] = perf_counter()
+        timer['start'] = False
+    if play_map['next_paths'] :
+        current_random_dir_path = play_map['next_paths'][0]
+        current_next_direction = play_map['next_paths'][0][0]
+        play_map['next_paths'].pop()
+        if not play_map['next_path'] : timer['start'] = True
+    else :
         ratio = False
         while ratio == False :
-            current_random_dir_path, current_next_direction = random_path(play_map) ###
+            current_random_dir_path, current_next_direction = random_path(play_map)
             current_length = len(current_random_dir_path)
             length_ratio = current_length / constant['max_length']
-            time = perf_counter() - start_time
-            time_ratio = time / max_time
+            time = perf_counter() - timer['start_time']
+            time_ratio = time / timer['max']
             ratio = length_ratio > time_ratio  
-            if time >= max_time : break
+            if time >= timer['max'] : break
+    return current_random_dir_path, current_next_direction, current_length, timer
+
+def best_random_path(play_map, target, status) :
+    best_value, try_, time = 0, 0, 0
+    max_time = constant['start_time'] if status == 'start' else constant['turn_time']
+    timer = {'max' : max_time, 'start' : False, 'start_time' : 0}
+    max_length, min_value = 0, 0
+    best_values, possible_path, dir_path, next_direction = [], [], [], [], 
+    while time < timer['max'] :
         
+        current_random_dir_path, current_next_direction, current_length, timer = build_path(play_map, target, timer)
+    
         value, current_possible_path = evaluate_dir_map(play_map, target, current_random_dir_path)
+        
         if debug :
             if value > best_value :
                 best_value = value
-                time = perf_counter() - start_time
+                time = perf_counter() - timer['start']
                 metrics = {'dir_path' : current_random_dir_path, 'path_value' : value, 
                            'process_time' : time, 'path_length' :len(current_random_dir_path),
                            'swing_turn' :  try_ }
@@ -469,7 +490,7 @@ def best_random_path(play_map, target, status) :
                 next_direction.pop(-1)
                 min_value = best_values[-1]
                 # arranger ça quand on aurra du temps
-        time = perf_counter() - start_time
+        time = perf_counter() - timer['start_time']
         try_ += 1
     if status == 'debug_random_path' : return metrics
     return possible_path, dir_path, next_direction, max_length
@@ -482,10 +503,6 @@ def next_tile(play_map, target, status) : # nouveau
     play_map['best_paths'] = dir_path
     idx = randrange(constant['stacking'])
     play_map['next_direction'] = next_direction[idx]
-    play_map['next_tile'] = ( add_tuple(*play_map['position'], next_direction) 
-                             if len(play_map['position']) == 1
-                             else False
-                           )
     possible_path = possible_path[idx]
     dir_path = dir_path[idx]
     if status == 'start' : 
