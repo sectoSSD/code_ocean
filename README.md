@@ -1,5 +1,4 @@
 Good to know :
-    
 Direction : 'MOVE Direction' is the main action possible in the game. To be read in a two dimensional 
             map each direction are translated in a tuple (x,y) :
             'S' -> [( 0, 1)]
@@ -17,6 +16,7 @@ seek_area :  Map showing in wich tile a submarine could start or could be accord
                  A the start seek_area is the map showing in wich tile the sub could start according to a
                  random generated direction_path (see random_path()). In game loop it is where a submarine could 
                  be according of the last direction it has taken befor. 
+***
 play_map keys :
 Play_map is the most important (and almost unique) place where are compute player information.
 Both players have their own play_map which contains all the information about the player's game. 
@@ -46,3 +46,14 @@ It is dictionnary containing several types of variable and sequences.
                            wich are the index 0 of 'dir' list and 'last_tiles' list.
 'last_tiles :             List of tuples representing tiles previously traveled by the submarine'.
                           [(1,2),(1,1),(1,1),(0,0)] when following the 'dir' exemple above.
+***
+    debug keys :
+        'random path' : run best_random_path (), random_path() and value() several time. Print and plot
+                        some indicator showing how best direction path is chosen.
+        
+        'debug_path'  : give graphic view of the direction_path chosen by best_random_path() 
+        
+        'check_seek_area' : checks adjustement of config_seek_area()
+        'debug_map'   : give graphic view of seek_area which show where the sub can be according of
+                        the direction_path taken. At start shows wich start tile could be chosen. In game
+                        loop where the submarine could be. See more in debug_map()
