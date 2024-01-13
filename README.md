@@ -1,3 +1,22 @@
+Good to know :
+    
+Direction : 'MOVE Direction' is the main action possible in the game. To be read in a two dimensional 
+            map each direction are translated in a tuple (x,y) :
+            'S' -> [( 0, 1)]
+            'N' -> [( 0,-1)]
+            'E' -> [( 1, 0)]
+            'W' -> [(-1, 0)]
+            Because when the 'SILENCE' implied that several directions are possible, directions are put in
+            list
+Direction path : it's list of direction. There are two direction paths. The fist is build in random_path and 
+                 is made to seek what is the better way to choose in a given position according the several 
+                 parameters calculatid in evaluate_dir_map(). The second is the real directions taken by the 
+                 submarines during the last rounds of the game. It's load in play_map['direction_path'] and run in config_seek_area()
+                 to know in wich tile could be the my and the opposite submarine.
+seek_area :  Map showing in wich tile a submarine could start or could be according of a direction path.
+                 A the start seek_area is the map showing in wich tile the sub could start according to a
+                 random generated direction_path (see random_path()). In game loop it is where a submarine could 
+                 be according of the last direction it has taken befor. 
 play_map keys :
 Play_map is the most important (and almost unique) place where are compute player information.
 Both players have their own play_map which contains all the information about the player's game. 
