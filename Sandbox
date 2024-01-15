@@ -204,7 +204,7 @@ def normal_law(x,s2,mu): # nouveau
 
 def reverse_direction(direction) :
     if len(direction[0]) != 2 : raise Exception(f"{direction} not valid")
-    return (direction[0][0] * -1 , direction[0][1] * -1)
+    return [(direction[0][0] * -1 , direction[0][1] * -1)]
 
 def extending(direction_path) :
     if direction_path : 
@@ -698,6 +698,7 @@ def play(my_play_map, his_play_map) :
     print(f"next dir befor update {my_play_map['next_direction']}")
     print(f"next dir path befor update {my_play_map['direction_path']}")
     my_play_map['direction_path'].insert(0,reversed_direction)
+    print(f"next dir path befor update {my_play_map['direction_path']}")
     play_map = update_play_map(my_play_map, his_play_map)
     return 
 
