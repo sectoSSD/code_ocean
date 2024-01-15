@@ -442,7 +442,9 @@ def next_tile(play_map) : # nouveau
     search_map = search_map[idx]
     dir_path = dir_path[idx]
     if play_map['status'] == 'start' : 
+        print(f" search_map = {search_map}")
         play_map['position'] = random.choice( list(filter(lambda key : search_map[key] == 1, search_map)) )
+        print(f"my_position = {play_map['position']}")
     if 'debug_map' in debug : debug_map(search_map, play_map['status'])
     if 'debug_path' in debug : debug_path(dir_path, play_map['status'], show_path = True)
     return play_map
@@ -567,16 +569,17 @@ def hunting() :
 
 def config_search_map(play_map) :
     
-    
     if not play_map['direction_path'] : raise Exception('there no direction path')
     init_fork_map ={'fork':{}}
     positiv_result = 0
     poll_rate = constant['sampling']
-    temp_search_area = []
+    non_tested, sample, temp_search_area = [], [], []
 
     while True :
-
-        non_tested, sample = train_test_split(play_map['search_area'], test_size=constant['sampling'])
+        if play_map['status'] != 'start' :
+            try : non_tested, sample = train_test_split(play_map['search_area'], test_size=constant['sampling'])
+            except : ValueError : sample = play_map['search_area'] # ???
+        else : sample = play_map['search_area']
         for tile in sample :
             fork_map = copy.deepcopy(init_fork_map)
             if off_side_max(tile, play_map) :
@@ -586,10 +589,10 @@ def config_search_map(play_map) :
                 play_map['search_map'][tile] = result
                 positiv_result += result
                 if result : temp_search_area.append(tile)
-        positive_ratio = len(temp_search_area) / game_map['nb_tile']
+        positive_ratio = round(len(temp_search_area) / game_map['nb_tile'], 2)
         if  positive_ratio > 1 - poll_rate or not non_tested :
-            if play_map['status'] == 'next_tile' : return play_map['search_map'] # à changer
             for tile in non_tested : play_map['search_map'][tile] = positive_ratio
+            if play_map['status'] == 'next_tile' : return play_map['search_map']
             return play_map # positive_ratio
         else : 
             play_map['search_area'] = non_tested
@@ -693,14 +696,12 @@ def play(my_play_map, his_play_map) :
     # evaluer silence
     
     # evaluer surface 
-    
+
+    my_play_map['position'] = add_tuple(my_play_map['position'], my_play_map['next_direction'][0])
     reversed_direction = reverse_direction(my_play_map['next_direction'])
-    print(f"next dir befor update {my_play_map['next_direction']}")
-    print(f"next dir path befor update {my_play_map['direction_path']}")
     my_play_map['direction_path'].insert(0,reversed_direction)
-    print(f"next dir path befor update {my_play_map['direction_path']}")
     play_map = update_play_map(my_play_map, his_play_map)
-    return 
+    return  my_play_map, his_play_map
 
 def game_loop(my_play_map, his_play_map) : # nouveau
     global lap
@@ -713,7 +714,7 @@ def game_loop(my_play_map, his_play_map) : # nouveau
         
         his_play_map = manage_order(his_order, sonar_result, his_play_map, my_play_map)
         
-        my_play_map = play(my_play_map, his_play_map)     
+        #my_play_map = play(my_play_map, his_play_map)     
         
         lap += 1
 
