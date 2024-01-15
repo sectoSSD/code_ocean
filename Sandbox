@@ -96,7 +96,7 @@ def debug_map(search_map, status) :
     for y in range(game_map['size']):
         line = []
         for x in range(game_map['size']):
-            try : line.append(f'{search_map[x,y]:02}')
+            try : line.append(f'{search_map[x,y]:02}' if (search_map[x,y] == 1 or search_map[x,y] == 0) else '__')
             except KeyError : line.append('XX')
         print(*line, sep=' ')  
     return
@@ -731,9 +731,9 @@ def start() : # nouveau
 def main(): ### nouveau
     config_constant()
     config_status_list()
-    debug_menu(test_mod          = True,       random_path    = True,
+    debug_menu(test_mod          = True,       random_path    = False,
                debug_run_path    = False,      debug_path     = False,
-               check_search_map  = False,      debug_map      = False,
+               check_search_map  = False,      debug_map      = True,
                start             = True,       game_loop      = True)
     config_game_map()
     if 'random_path' in debug : return debug_random_path()
