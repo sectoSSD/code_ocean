@@ -173,7 +173,7 @@ def debug_random_path() : # nouveau
     color = dict(zip(indicator, color))
     metric = {key : [] for key in indicator}
     while count != constant['num_test'] :
-        temp = best_random_path(my_play_map, status = 'debug_random_path') 
+        temp = best_random_path(my_play_map) 
         for key in indicator : 
             try : metric[key].append(temp[key])
             except KeyError : pass
@@ -442,9 +442,7 @@ def next_tile(play_map) : # nouveau
     search_map = search_map[idx]
     dir_path = dir_path[idx]
     if play_map['status'] == 'start' : 
-        print(f" search_map = {search_map}")
         play_map['position'] = random.choice( list(filter(lambda key : search_map[key] == 1, search_map)) )
-        print(f"my_position = {play_map['position']}")
     if 'debug_map' in debug : debug_map(search_map, play_map['status'])
     if 'debug_path' in debug : debug_path(dir_path, play_map['status'], show_path = True)
     return play_map
@@ -653,10 +651,8 @@ def game_input(his_play_map, my_play_map) :
                      'his_life'    : 6,
                     })
         sonar_result = 'NA'
-        print(f"flag {his_play_map['status']}")
         his_play_map = next_tile(his_play_map)
         his_order = f"MOVE {dir_converter(*his_play_map['next_direction'])} TORPEDO"
-        print(his_order)
     return sonar_result, his_order, game
 
 def manage_order(order, sonar_result, his_play_map, my_play_map) :
@@ -735,10 +731,10 @@ def start() : # nouveau
 def main(): ### nouveau
     config_constant()
     config_status_list()
-    debug_menu(test_mod       = True,      random_path    = False,
-               debug_run_path = False,      debug_path     = False,
-               check_search_map  = False,   debug_map      = False,
-               start          = True,      game_loop      = True)
+    debug_menu(test_mod          = True,       random_path    = True,
+               debug_run_path    = False,      debug_path     = False,
+               check_search_map  = False,      debug_map      = False,
+               start             = True,       game_loop      = True)
     config_game_map()
     if 'random_path' in debug : return debug_random_path()
     if 'check_search_map' in debug : return check_search_map()
@@ -751,10 +747,13 @@ def main(): ### nouveau
 
 if __name__ == '__main__' : main()
 """
-voir si c'est possible de regler config_search_map() pour que tout fonction avec une liste en sortie
-même evaluate_dir_map et hidding_value
-integrer a best_random_path mes trois next_direction_path et voir si on en met plus ou pas
-mettre des raise exception dans init_play_map et dans config_play_map ? 
+
+1 - integrer a best_random_path mes trois next_direction_path et voir si on en met plus ou pas
+
+2 - verifier le comportement de play_map et en particulier de search_map
+
+3 - verifier comportement de fork_map dans search_map
+
 verrifier dans my_scatter si c'est normal qu'il y ai eu des erreurs à stat.mean
 tester tous les ordres
 """
