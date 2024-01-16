@@ -485,7 +485,6 @@ def torpedo_area(center) :
 def config_search_map(play_map) :
     
     if not play_map['direction_path'] : raise Exception('there no direction path')
-    init_fork_map ={'fork':{}}
     positiv_result = 0
     poll_rate = constant['sampling']
     non_tested, sample, temp_search_area = [], [], []
@@ -499,7 +498,7 @@ def config_search_map(play_map) :
             if off_side_max(tile, play_map) :
                 play_map['search_map'][tile] = 0 
             else :  
-                result = run_path(tile, play_map, init_fork_map)
+                result = run_path(tile, play_map)
                 play_map['search_map'][tile] = result
                 positiv_result += result
                 if result : temp_search_area.append(tile)
@@ -512,8 +511,8 @@ def config_search_map(play_map) :
             play_map['search_area'] = non_tested
             poll_rate += constant['sampling']
 
-def run_path(tile, play_map, init_fork_map) :
-    fork_map = copy.deepcopy(init_fork_map)
+def run_path(tile, play_map) :
+    fork_map = copy.deepcopy(config_fork_map(play_map))
     cursor = initial_cursor(play_map, fork_map, tile)
     controller = {'blocking' : False,  'end_path' : False, 'stop' : True}
     search_map = 0 # possible path for this tile
@@ -575,13 +574,14 @@ def update_cursor (cursor, play_map, fork_map) :
 def config_fork_map (play_map) :
     # how fork_map is built :
     fork_map = {'fork' : {}, 'max' : {}, 'fork-index': {}, 'index-fork' : {}}
-    index = 0
-    for fork in play_map['fork'] :
-        fork_map['fork'][fork] = 0
-        fork_map['max'][fork] = len(play_map['direction_path'][fork])
-        fork_map['fork-index'][fork] = index
-        fork_map['index-fork'][index] = fork
-        index += 1
+    if play_map.get('fork') :
+        index = 0
+        for fork in play_map['fork'] :
+            fork_map['fork'][fork] = 0
+            fork_map['max'][fork] = len(play_map['direction_path'][fork])
+            fork_map['fork-index'][fork] = index
+            fork_map['index-fork'][index] = fork
+            index += 1
     return fork_map
 
 def del_fork_map (fork_map, fork) :
