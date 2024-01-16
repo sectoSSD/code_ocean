@@ -260,9 +260,9 @@ def blocking(tile, play_map, index = None) :
         blocking = (    True 
                         if tile in game_map['island'] 
                         or off_side_tile(tile) 
-                        or ( play_map['sector_in'].get(index) != None 
+                        or ( play_map['sector_in'].get(index) 
                                 and play_map['sector_in'].get(index) != sector(tile) )
-                        or ( play_map['sector_out'].get(index) != None
+                        or ( play_map['sector_out'].get(index)
                              and tile not in play_map['sector_out'].get(index) )
                         else False
                     )
@@ -520,7 +520,7 @@ def run_path(tile, play_map) :
     while True :
         
         "A : embranchement : "
-        if fork_map['fork'].get(cursor['idx']) != None :
+        if fork_map['fork'].get(cursor['idx']) :
             fork_map = update_fork_map(cursor['idx'], fork_map)
             controller['stop'] = stop(fork_map)
         "B : obstacle : " 
@@ -552,7 +552,7 @@ def initial_cursor(play_map, fork_map, tile) :
     init_cursor = {'dir' : (), 'idx' : 0, 'tile' : () }
     init_cursor['dir'] = ( 
                           play_map['direction_path'][0][fork_map['fork'][0]-1] 
-                          if fork_map['fork'].get(0) != None
+                          if fork_map['fork'].get(0)
                           else play_map['direction_path'][0][0]
                          )
     init_cursor['tile'] = add_tuple(tile, init_cursor['dir'])
@@ -562,7 +562,7 @@ def update_cursor (cursor, play_map, fork_map) :
     cursor['idx'] += 1
     branch_index = ( 
                     fork_map['fork'][cursor['idx']] 
-                    if fork_map['fork'].get(cursor['idx']) != None
+                    if fork_map['fork'].get(cursor['idx'])
                     else 0 
                    )
     cursor['dir'] = play_map['direction_path'][ cursor['idx'] ] [branch_index]
