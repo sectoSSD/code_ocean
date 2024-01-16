@@ -1,36 +1,13 @@
 # Library
 
-import random
-"""
-from random import choice
-from random import choices
-from random import randrange # nouveau ?
-from random import sample
-"""
 from sklearn.model_selection import train_test_split
 from time import perf_counter
 import statistics as stat
+import random
 import math
 import copy
 
-# global
-
-def debug_menu(test_mod           = False,    random_path     = False,
-               debug_run_path     = False,    debug_path      = False,
-               check_search_map   = False,    debug_map       = False,
-               start              = False,    game_loop       = False):
-    global debug
-    key = []
-    if test_mod         : key.append('test_mod')
-    if random_path      : key.append('random_path') 
-    if debug_run_path   : key.append('debug_run_path') 
-    if check_search_map : key.append('check_search_map')
-    if debug_map        : key.append('debug_map') 
-    if debug_path       : key.append('debug_path')
-    if start            : key.append('start')
-    if game_loop        : key.append('game_loop')
-    
-    debug = key if test_mod else []
+" CONSTANT"
 
 def config_status_list():
     global status_list
@@ -73,7 +50,25 @@ def config_game_map() : # nouveau
         sea = [xy for xy in tiles if xy not in island]
     game_map = {'island' : island, 'size' : size, 'nb_tile' : size**2,'sea' : sea, 'IA start' : bool(my_id)}
 
-# debug
+" DEBUG"
+
+def debug_menu(test_mod           = False,    random_path     = False,
+               debug_run_path     = False,    debug_path      = False,
+               check_search_map   = False,    debug_map       = False,
+               start              = False,    game_loop       = False):
+    global debug
+    key = []
+    if test_mod         : key.append('test_mod')
+    if random_path      : key.append('random_path') 
+    if debug_run_path   : key.append('debug_run_path') 
+    if check_search_map : key.append('check_search_map')
+    if debug_map        : key.append('debug_map') 
+    if debug_path       : key.append('debug_path')
+    if start            : key.append('start')
+    if game_loop        : key.append('game_loop')
+    
+    debug = key if test_mod else []
+
 
 def check_search_map() :
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
@@ -193,7 +188,7 @@ def debug_random_path() : # nouveau
     ax2.tick_params(axis='y', labelcolor='tab:blue')
     plt.show()
 
-# tools
+" TOOLS"
 
 def add_tuple (tuple_1, tuple_2) :
     return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
@@ -275,7 +270,8 @@ def stop(fork_map) :
         return True
     else : return False
 
-# map
+" PLAY MAP"
+
 def init_play_map(who,status) :
     if who not in ['he','me'] : raise Exception(f"{who} is not valid")
     if status not in status_list : raise Exception(f"{status} is not valid")
@@ -332,22 +328,76 @@ def update_play_map(play_map, opp_play_map) :
     if play_map['position'] not in play_map['last_tiles'] : play_map['last_tiles'].append(play_map['position'])
     return play_map
 
-# next_tile
+" NEXT TILE"
 
-def evaluate_dir_map(play_map, current_random_dir_path) :
+def next_tile(play_map) : # nouveau
+
+    search_map, dir_path, next_direction, max_length = best_random_path(play_map)
     
-    all_random_dir_map = ( [*play_map['direction_path'],*current_random_dir_path] 
-                           if play_map['direction_path'] 
-                           else current_random_dir_path )
-    current_random_play_map = config_temp_play_map(all_random_dir_map)
-    current_search_map   = config_search_map(current_random_play_map) # à changer : on peut integrer à config_temp ...
-    
-    hiding_value = scatter(current_search_map, current_random_play_map['direction_path_length'])
-    hunting_value = hunting()
-    
-    value = round( (1-play_map['target']) * hiding_value + play_map['target'] * hunting_value, 2)
-    
-    return value, current_search_map 
+    play_map['max_length_next_path'] = max_length
+    play_map['best_paths'] = dir_path
+    idx = random.randrange(constant['stacking'])
+    play_map['next_direction'] = next_direction[idx]
+    search_map = search_map[idx]
+    dir_path = dir_path[idx]
+    if play_map['status'] == 'start' : 
+        play_map['position'] = random.choice( list(filter(lambda key : search_map[key] == 1, search_map)) )
+    if 'debug_map' in debug : debug_map(search_map, play_map['status'])
+    if 'debug_path' in debug : debug_path(dir_path, play_map['status'], show_path = True)
+    return play_map
+
+def best_random_path(play_map) :
+    try_, max_length, test_value, min_value = 0, 0, -1, -1
+    best_values, search_map, dir_path, next_direction = [], [], [], []
+    max_time = constant['start_time'] if play_map['status'] == 'start' else constant['turn_time']
+    start_time  = perf_counter()
+    open_1 = True
+    while open_1 == True :
+        open_2 = perf_counter() - start_time < max_time
+        while open_2 == True :
+            current_random_dir_path, current_next_direction = random_path(play_map) ###
+            current_length = len(current_random_dir_path)
+            length_ratio = current_length / constant['max_length']
+            time_ratio = max_time / (perf_counter() - start_time + 1)
+            open_2 = length_ratio < time_ratio and perf_counter() - start_time < max_time 
+
+        if open_2 == False and play_map['next_direction_paths'] :
+            current_random_dir_path = play_map['next_direction_paths'][0]
+            play_map['next_direction_paths'].pop(0)
+        
+        value, current_search_map = evaluate_dir_map(play_map, current_random_dir_path)
+
+        if play_map['status'] == 'debug_random_path' :
+            if value > test_value :
+                test_value = value
+                time = perf_counter() - start_time
+                metrics = {'direction_path' : current_random_dir_path, 'path_value' : value, 
+                           'process_time' : time, 'path_length' :len(current_random_dir_path),
+                           'swing_turn' :  try_ }
+                
+
+        if current_length > max_length : max_length = current_length
+        if len(best_values) < constant['stacking'] :
+            best_values.append(value)
+            search_map.append(current_search_map)
+            dir_path.append(current_random_dir_path)
+            next_direction.append(current_next_direction)
+        elif value >= min_value : 
+            for idx in range(constant['stacking']) :
+                if value > best_values[idx] :
+                    best_values.insert(idx, value)
+                    search_map.insert(idx, current_search_map)
+                    dir_path.insert(idx, current_random_dir_path)
+                    next_direction.insert(idx, current_next_direction)
+                    best_values.pop(-1)
+                    search_map.pop(-1)
+                    dir_path.pop(-1)
+                    next_direction.pop(-1)
+                    min_value = best_values[-1]
+        try_ += 1
+        open_1 = perf_counter() - start_time < max_time or play_map['next_direction_paths'] 
+    if play_map['status'] == 'debug_random_path' : return metrics
+    return search_map, dir_path, next_direction, max_length
 
 def random_path(initial_play_map) : # nouveau
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
@@ -380,72 +430,20 @@ def random_path(initial_play_map) : # nouveau
                         return current_direction_path, first_direction
                     else : break
 
-def best_random_path(play_map) :
-    best_value, try_, start_time, time = -1, 0, perf_counter(), 0
-    max_time = constant['start_time'] if play_map['status'] == 'start' else constant['turn_time']
-    max_length, min_value = 0, 0
-    best_values, search_map, dir_path, next_direction = [], [], [], [], 
-    while time < max_time :
-        ratio = False
-        while ratio == False :
-            current_random_dir_path, current_next_direction = random_path(play_map) ###
-            current_length = len(current_random_dir_path)
-            length_ratio = current_length / constant['max_length']
-            time = perf_counter() - start_time
-            time_ratio = time / max_time
-            ratio = length_ratio > time_ratio  
-            if time > max_time : break
-        
-        value, current_search_map = evaluate_dir_map(play_map, current_random_dir_path)
-
-        if play_map['status'] == 'debug_random_path' :
-            if value > best_value :
-                best_value = value
-                time = perf_counter() - start_time
-                metrics = {'direction_path' : current_random_dir_path, 'path_value' : value, 
-                           'process_time' : time, 'path_length' :len(current_random_dir_path),
-                           'swing_turn' :  try_ }
-
-        if current_length > max_length : max_length = current_length
-        if len(best_values) < constant['stacking'] :
-            best_values.append(value)
-            search_map.append(current_search_map)
-            dir_path.append(current_random_dir_path)
-            next_direction.append(current_next_direction)
-            continue
-        if value <= min_value : continue
-        for idx in range(constant['stacking']) :
-            if best_values[idx] < value :
-                best_values.insert(idx, value)
-                search_map.insert(idx, current_search_map)
-                dir_path.insert(idx, current_random_dir_path)
-                next_direction.insert(idx, current_next_direction)
-                best_values.pop(-1)
-                search_map.pop(-1)
-                dir_path.pop(-1)
-                next_direction.pop(-1)
-                min_value = best_values[-1]
-                # arranger ça quand on aurra du temps
-        time = perf_counter() - start_time
-        try_ += 1
-    if play_map['status'] == 'debug_random_path' : return metrics
-    return search_map, dir_path, next_direction, max_length
-
-def next_tile(play_map) : # nouveau
-
-    search_map, dir_path, next_direction, max_length = best_random_path(play_map)
+def evaluate_dir_map(play_map, current_random_dir_path) :
     
-    play_map['max_length_next_path'] = max_length
-    play_map['best_paths'] = dir_path
-    idx = random.randrange(constant['stacking'])
-    play_map['next_direction'] = next_direction[idx]
-    search_map = search_map[idx]
-    dir_path = dir_path[idx]
-    if play_map['status'] == 'start' : 
-        play_map['position'] = random.choice( list(filter(lambda key : search_map[key] == 1, search_map)) )
-    if 'debug_map' in debug : debug_map(search_map, play_map['status'])
-    if 'debug_path' in debug : debug_path(dir_path, play_map['status'], show_path = True)
-    return play_map
+    all_random_dir_map = ( [*play_map['direction_path'],*current_random_dir_path] 
+                           if play_map['direction_path'] 
+                           else current_random_dir_path )
+    current_random_play_map = config_temp_play_map(all_random_dir_map)
+    current_search_map   = config_search_map(current_random_play_map)
+    
+    hiding_value = scatter(current_search_map, current_random_play_map['direction_path_length'])
+    hunting_value = hunting()
+    
+    value = round( (1-play_map['target']) * hiding_value + play_map['target'] * hunting_value, 2)
+    
+    return value, current_search_map
 
 # game_loop : orders
 
@@ -474,6 +472,69 @@ def torpedo_area(center) :
             current_position = ref_position
             range_ = 0
         if try_ == max_try or len(torpedo_area) == 40 : return torpedo_area
+
+" SEARCH MAP"
+
+def config_search_map(play_map) :
+    
+    if not play_map['direction_path'] : raise Exception('there no direction path')
+    init_fork_map ={'fork':{}}
+    positiv_result = 0
+    poll_rate = constant['sampling']
+    non_tested, sample, temp_search_area = [], [], []
+
+    while True :
+        if play_map['status'] != 'start' :
+            try : non_tested, sample = train_test_split(play_map['search_area'], test_size=constant['sampling'])
+            except ValueError : sample = play_map['search_area'] # ???
+        else : sample = play_map['search_area']
+        for tile in sample :
+            fork_map = copy.deepcopy(init_fork_map)
+            if off_side_max(tile, play_map) :
+                play_map['search_map'][tile] = 0 
+            else :  
+                result = run_path(tile, play_map, fork_map)
+                play_map['search_map'][tile] = result
+                positiv_result += result
+                if result : temp_search_area.append(tile)
+        positive_ratio = round(len(temp_search_area) / game_map['nb_tile'], 2)
+        if  positive_ratio > 1 - poll_rate or not non_tested :
+            for tile in non_tested : play_map['search_map'][tile] = positive_ratio
+            if play_map['status'] == 'next_tile' : return play_map['search_map']
+            return play_map # positive_ratio
+        else : 
+            play_map['search_area'] = non_tested
+            poll_rate += constant['sampling']
+
+def run_path(tile, play_map, fork_map) :
+    cursor = initial_cursor(play_map, fork_map, tile)
+    controller = {'blocking' : False,  'end_path' : False, 'stop' : True}
+    search_map = 0 # possible path for this tile
+    
+    while True :
+        
+        "A : embranchement : "
+        if fork_map['fork'].get(cursor['idx']) != None :
+            fork_map = update_fork_map(cursor['idx'], fork_map)
+            controller['stop'] = stop(fork_map)
+        "B : obstacle : " 
+        controller['blocking'] = blocking(cursor['tile'], play_map, cursor['idx'])
+        "C : bout de path : " 
+        controller['end_path'] = True if cursor['idx'] == play_map['direction_path_length'] - 1 else False
+
+        if 'debug_run_path' in debug : debug_run_path(controller, cursor, fork_map, tile)
+            
+        if controller['end_path'] == True and controller['blocking'] == False : search_map += 1
+        
+        if controller['stop'] == False :
+            if controller['blocking'] == True or controller['end_path'] == True :
+                cursor = initial_cursor(play_map, fork_map, tile)
+                continue
+        else :
+            if controller['blocking'] == True or controller['end_path'] == True :
+                return search_map
+        
+        cursor = update_cursor(cursor, play_map, fork_map)
 
 # cursor
 
@@ -565,68 +626,9 @@ def hunting() :
 
 # search_map
 
-def config_search_map(play_map) :
-    
-    if not play_map['direction_path'] : raise Exception('there no direction path')
-    init_fork_map ={'fork':{}}
-    positiv_result = 0
-    poll_rate = constant['sampling']
-    non_tested, sample, temp_search_area = [], [], []
 
-    while True :
-        if play_map['status'] != 'start' :
-            try : non_tested, sample = train_test_split(play_map['search_area'], test_size=constant['sampling'])
-            except : ValueError : sample = play_map['search_area'] # ???
-        else : sample = play_map['search_area']
-        for tile in sample :
-            fork_map = copy.deepcopy(init_fork_map)
-            if off_side_max(tile, play_map) :
-                play_map['search_map'][tile] = 0 
-            else :  
-                result = run_path(tile, play_map, fork_map)
-                play_map['search_map'][tile] = result
-                positiv_result += result
-                if result : temp_search_area.append(tile)
-        positive_ratio = round(len(temp_search_area) / game_map['nb_tile'], 2)
-        if  positive_ratio > 1 - poll_rate or not non_tested :
-            for tile in non_tested : play_map['search_map'][tile] = positive_ratio
-            if play_map['status'] == 'next_tile' : return play_map['search_map']
-            return play_map # positive_ratio
-        else : 
-            play_map['search_area'] = non_tested
-            poll_rate += constant['sampling']
 
-def run_path(tile, play_map, fork_map) :
-    cursor = initial_cursor(play_map, fork_map, tile)
-    controller = {'blocking' : False,  'end_path' : False, 'stop' : True}
-    search_map = 0 # possible path for this tile
-    
-    while True :
-        
-        "A : embranchement : "
-        if fork_map['fork'].get(cursor['idx']) != None :
-            fork_map = update_fork_map(cursor['idx'], fork_map)
-            controller['stop'] = stop(fork_map)
-        "B : obstacle : " 
-        controller['blocking'] = blocking(cursor['tile'], play_map, cursor['idx'])
-        "C : bout de path : " 
-        controller['end_path'] = True if cursor['idx'] == play_map['direction_path_length'] - 1 else False
-
-        if 'debug_run_path' in debug : debug_run_path(controller, cursor, fork_map, tile)
-            
-        if controller['end_path'] == True and controller['blocking'] == False : search_map += 1
-        
-        if controller['stop'] == False :
-            if controller['blocking'] == True or controller['end_path'] == True :
-                cursor = initial_cursor(play_map, fork_map, tile)
-                continue
-        else :
-            if controller['blocking'] == True or controller['end_path'] == True :
-                return search_map
-        
-        cursor = update_cursor(cursor, play_map, fork_map)
-
-# game
+" GAME LOOP MANAGER "
 
 def game_input(his_play_map, my_play_map) :
     game_keys = [
@@ -675,6 +677,8 @@ def manage_order(order, sonar_result, his_play_map, my_play_map) :
             if   sonar_result[1] == 'Y' : his_play_map['sector_in'][lap - 1] = sonar_result[0]
             elif sonar_result[1] == 'N' : his_play_map['sector_out'][lap - 1] = sonar_result[0]
     return update_play_map(his_play_map, my_play_map)
+
+" STEP OF THE GAME "
 
 def play(my_play_map, his_play_map) :
     # calculer play_map['target']
@@ -732,9 +736,9 @@ def main(): ### nouveau
     config_constant()
     config_status_list()
     debug_menu(test_mod          = True,       random_path    = False,
-               debug_run_path    = False,      debug_path     = False,
-               check_search_map  = False,      debug_map      = True,
-               start             = True,       game_loop      = True)
+               debug_run_path    = False,      debug_path     = True,
+               check_search_map  = False,      debug_map      = False,
+               start             = True,       game_loop      = False)
     config_game_map()
     if 'random_path' in debug : return debug_random_path()
     if 'check_search_map' in debug : return check_search_map()
@@ -747,8 +751,6 @@ def main(): ### nouveau
 
 if __name__ == '__main__' : main()
 """
-
-1 - integrer a best_random_path mes trois next_direction_path et voir si on en met plus ou pas
 
 2 - verifier le comportement de play_map et en particulier de search_map
 
