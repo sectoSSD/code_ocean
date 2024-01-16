@@ -10,8 +10,13 @@ import copy
 " CONSTANT"
 
 def config_global_var():
-    global status_list, neighbor_tiles
+    global status_list, neighbor_tiles, play_map_keys
     status_list    = ['start', 'game_loop', 'next_tile', 'debug_random_path']
+    play_map_keys  = ['who', 'status', 'direction_path', 'direction_path_length', 
+                      'direction_path_extending', 'fork', 'sector_in', 'sector_out',
+                      'sector_tiles', 'search_map', 'search_area', 'target', 'position',
+                      'last_tiles', 'next_directions', 'next_direction_paths', 
+                      'max_length_direction_path']
     neighbor_tiles = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)]
 
 def config_constant() :
@@ -299,17 +304,17 @@ def init_play_map(who,status) :
             # si status == 'me' or debug :
             'position'                  : tuple(),
             'last_tiles'                : list(),
-            'next_direction'            : list(),
-
+            
+            'next_directions'            : list(),
             'next_direction_paths'      : list(),
             'max_length_direction_path' : int()
            }
 
-def config_temp_play_map(direction_path, next_tile) :
+def config_temp_play_map(direction_path, next_direction) :
     "just a format for evaluate_dir_map()"
     return {'status'                   : 'next_tile',  
             'direction_path'           : direction_path,
-            'next_tile'                : next_tile,
+            'next_direction'                : next_direction,
             'direction_path_length'    : len(direction_path),
             'direction_path_extending' : extending(direction_path),
             
@@ -319,6 +324,8 @@ def config_temp_play_map(direction_path, next_tile) :
             }
 
 def update_play_map(play_map, opp_play_map) :
+    if any(key not in play_map_keys for key in list(play_map.keys())) : 
+        raise Exception("unknown keys in play_map")
     if play_map['who'] not in ['he','me']    : raise Exception(f"{play_map['who']} is not valid")
     if play_map['status'] not in status_list : raise Exception(f"{play_map['status']} is not valid")
     if not debug and play_map['who'] == 'he' and play_map['position'] : 
@@ -335,14 +342,16 @@ def update_play_map(play_map, opp_play_map) :
 
 def next_tile(play_map) : # nouveau
 
-    search_map, dir_path, next_direction, max_length = best_random_path(play_map)
+    best = best_random_path(play_map)
     
-    play_map['max_length_next_path'] = max_length
-    play_map['best_paths'] = dir_path
+    play_map['max_length_next_path'] = best['max_length']
+    play_map['next_direction_paths'] = best['direction_path']
+    play_map['next_directions'] = best['next_direction']
+    
     idx = random.randrange(constant['stacking'])
-    play_map['next_direction'] = next_direction[idx]
-    search_map = search_map[idx]
-    dir_path = dir_path[idx]
+    search_map = best['search_map'][idx]
+    dir_path = best['direction_path'][idx]
+    
     if play_map['status'] == 'start' : 
         play_map['position'] = random.choice( list(filter(lambda key : search_map[key] == 1, search_map)) )
     if 'debug_map' in debug : debug_map(search_map, play_map['status'])
@@ -350,8 +359,10 @@ def next_tile(play_map) : # nouveau
     return play_map
 
 def best_random_path(play_map) :
-    try_, max_length, test_value, min_value = 0, 0, -1, -1
-    best_values, search_map, dir_path, next_direction = [], [], [], []
+    try_, test_value, min_value = 0, -1, -1
+    keys_list = ['value', 'search_map', 'direction_path', 'next_direction']
+    best = {key : [] for key in keys_list}
+    best['max_length'] = 0
     max_time = constant['start_time'] if play_map['status'] == 'start' else constant['turn_time']
     start_time  = perf_counter()
     open_1 = True
@@ -367,7 +378,6 @@ def best_random_path(play_map) :
             temp_play_map['direction_path'] = play_map['next_direction_paths'][0]
             play_map['next_direction_paths'].pop(0)
         
-        # value, current_search_map = evaluate_dir_map(play_map, temp_play_map)
         temp_play_map = evaluate_dir_map(play_map, temp_play_map)
 
         if play_map['status'] == 'debug_random_path' :
@@ -378,30 +388,24 @@ def best_random_path(play_map) :
                            'process_time' : time, 'path_length' :temp_play_map['direction_path_length'],
                            'swing_turn' :  try_ }
                 
-        max_length = (temp_play_map['direction_path_length'] 
-                      if temp_play_map['direction_path_length'] > max_length
-                      else max_length)
-        if len(best_values) < constant['stacking'] :
-            best_values.append(temp_play_map['value'])
-            search_map.append(temp_play_map['search_map'])
-            dir_path.append(temp_play_map['direction_path'])
-            next_direction.append(temp_play_map['next_tile'])
+        best['max_length'] = (temp_play_map['direction_path_length'] 
+                      if temp_play_map['direction_path_length'] > best['max_length']
+                      else best['max_length'])
+        if len(best['value']) < constant['stacking'] :
+            for key in keys_list :
+                best[key].append(temp_play_map[key])
         elif temp_play_map['value'] >= min_value : 
             for idx in range(constant['stacking']) :
-                if temp_play_map['value'] > best_values[idx] :
-                    best_values.insert(idx, temp_play_map['value'])
-                    search_map.insert(idx, temp_play_map['search_map'])
-                    dir_path.insert(idx, temp_play_map['direction_path'])
-                    next_direction.insert(idx, temp_play_map['next_tile'])
-                    best_values.pop(-1)
-                    search_map.pop(-1)
-                    dir_path.pop(-1)
-                    next_direction.pop(-1)
-                    min_value = best_values[-1]
+                if temp_play_map['value'] > best['value'][idx] :
+                    for key in keys_list :
+                        best[key].insert(0,temp_play_map[key])
+                    for key in keys_list :
+                        best[key].pop(-1)
+                    min_value = best['value'][-1]
         try_ += 1
         open_1 = perf_counter() - start_time < max_time or play_map['next_direction_paths'] 
     if play_map['status'] == 'debug_random_path' : return metrics
-    return search_map, dir_path, next_direction, max_length
+    return best
 
 def random_path(initial_play_map) : # nouveau
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
@@ -652,7 +656,9 @@ def game_input(his_play_map, my_play_map) :
                     })
         sonar_result = 'NA'
         his_play_map = next_tile(his_play_map)
-        his_order = f"MOVE {dir_converter(*his_play_map['next_direction'])} TORPEDO"
+        next_direction = random.choice(his_play_map['next_direction'])
+        his_order = f"MOVE {dir_converter(*next_direction)} TORPEDO"
+        his_play_map['position'] = add_tuple(his_play_map['position'], next_direction[0])
     return sonar_result, his_order, game
 
 def manage_order(order, sonar_result, his_play_map, my_play_map) :
@@ -695,8 +701,9 @@ def play(my_play_map, his_play_map) :
     
     # evaluer surface 
 
-    my_play_map['position'] = add_tuple(my_play_map['position'], my_play_map['next_direction'][0])
-    reversed_direction = reverse_direction(my_play_map['next_direction'])
+    next_direction = random.choice(my_play_map['next_direction'])
+    my_play_map['position'] = add_tuple(my_play_map['position'], next_direction[0])
+    reversed_direction = reverse_direction(next_direction)
     my_play_map['direction_path'].insert(0,reversed_direction)
     play_map = update_play_map(my_play_map, his_play_map)
     return  my_play_map, his_play_map
