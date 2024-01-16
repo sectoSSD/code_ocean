@@ -733,7 +733,7 @@ def main(): ### nouveau
     config_global_var()
     debug_menu(test_mod          = True,       random_path    = False,
                debug_run_path    = False,      debug_path     = True,
-               check_search_map  = False,      debug_map      = False,
+               check_search_map  = False,      debug_map      = True,
                start             = True,       game_loop      = False)
     config_game_map()
     if 'random_path' in debug : return debug_random_path()
@@ -747,7 +747,6 @@ def main(): ### nouveau
 
 if __name__ == '__main__' : main()
 """
-
 2 - verifier le comportement de play_map et en particulier de search_map
 
 3 - verifier comportement de fork_map dans search_map
