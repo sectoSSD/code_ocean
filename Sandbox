@@ -496,11 +496,10 @@ def config_search_map(play_map) :
             except ValueError : sample = play_map['search_area'] # ???
         else : sample = play_map['search_area']
         for tile in sample :
-            fork_map = copy.deepcopy(init_fork_map)
             if off_side_max(tile, play_map) :
                 play_map['search_map'][tile] = 0 
             else :  
-                result = run_path(tile, play_map, fork_map)
+                result = run_path(tile, play_map, init_fork_map)
                 play_map['search_map'][tile] = result
                 positiv_result += result
                 if result : temp_search_area.append(tile)
@@ -513,7 +512,8 @@ def config_search_map(play_map) :
             play_map['search_area'] = non_tested
             poll_rate += constant['sampling']
 
-def run_path(tile, play_map, fork_map) :
+def run_path(tile, play_map, init_fork_map) :
+    fork_map = copy.deepcopy(init_fork_map)
     cursor = initial_cursor(play_map, fork_map, tile)
     controller = {'blocking' : False,  'end_path' : False, 'stop' : True}
     search_map = 0 # possible path for this tile
@@ -572,7 +572,6 @@ def update_cursor (cursor, play_map, fork_map) :
 
 # fork_map
 
-"""
 def config_fork_map (play_map) :
     # how fork_map is built :
     fork_map = {'fork' : {}, 'max' : {}, 'fork-index': {}, 'index-fork' : {}}
@@ -584,7 +583,6 @@ def config_fork_map (play_map) :
         fork_map['index-fork'][index] = fork
         index += 1
     return fork_map
-"""
 
 def del_fork_map (fork_map, fork) :
     index = fork_map['fork-index'][fork] 
