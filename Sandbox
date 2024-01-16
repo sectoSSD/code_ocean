@@ -9,9 +9,10 @@ import copy
 
 " CONSTANT"
 
-def config_status_list():
-    global status_list
-    status_list = ['start', 'game_loop', 'next_tile', 'debug_random_path']
+def config_global_var():
+    global status_list, neighbor_tiles
+    status_list    = ['start', 'game_loop', 'next_tile', 'debug_random_path']
+    neighbor_tiles = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)]
 
 def config_constant() :
     global constant
@@ -599,14 +600,13 @@ def update_fork_map(fork, fork_map):
     
 # game reading 
 
-def scatter(search_map, length) : # nouveau
-    next_tiles = [(x,y) for x in range(-1,2) for y in range(-1,2) if (x,y) != (0,0)]
+def scatter(search_map, length) :
     spread_list = []
     sector_list = []
     for key in search_map.keys() :
         sector_list.append(sector(key))
         if search_map[key] == 1 :
-            cursor_list = [add_tuple(key, tiles) for tiles in next_tiles]
+            cursor_list = [add_tuple(key, tiles) for tiles in neighbor_tiles]
             count = 0
             for cursor in cursor_list :
                 try : search_map[cursor]
@@ -623,10 +623,6 @@ def scatter(search_map, length) : # nouveau
 
 def hunting() :
     return 0
-
-# search_map
-
-
 
 " GAME LOOP MANAGER "
 
@@ -734,7 +730,7 @@ def start() : # nouveau
 
 def main(): ### nouveau
     config_constant()
-    config_status_list()
+    config_global_var()
     debug_menu(test_mod          = True,       random_path    = False,
                debug_run_path    = False,      debug_path     = True,
                check_search_map  = False,      debug_map      = False,
