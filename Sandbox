@@ -97,8 +97,8 @@ def debug_map(search_map, status) :
     for y in range(game_map['size']):
         line = []
         for x in range(game_map['size']):
-            try : line.append(f'{search_map[x,y]:02}' if (search_map[x,y] == 1 or search_map[x,y] == 0) else '__')
-            except KeyError : line.append('XX')
+            try : line.append(f'{int(search_map[x,y]*100):03}' if (search_map[x,y] == 1 or search_map[x,y] == 0) else '___')
+            except KeyError : line.append('XXX')
         print(*line, sep=' ')  
     return
 
@@ -452,38 +452,33 @@ def evaluate_dir_map(play_map, temp_play_map) :
     
     return temp_play_map
 
-# game_loop : orders
+def scatter(play_map) :
+    spread_list = []
+    sector_list = []
+    for key in play_map['search_map'].keys() :
+        sector_list.append(sector(key))
+        if play_map['search_map'][key] == 1 :
+            cursor_list = [add_tuple(key, tiles) for tiles in neighbor_tiles]
+            count = 0
+            for cursor in cursor_list :
+                try : play_map['search_map'][cursor]
+                except KeyError : continue
+                if play_map['search_map'][cursor] == 1 : count += 1
+                spread_list.append(1 - (0.1 * count) if count >= 2 else 1)
+    sector_value = math.log(len(set(sector_list)) + 1, 10)
+    length_value = math.sin(play_map['direction_path_length'] * (math.pi / 2) / constant['max_length'])
+    try : spread_value = stat.mean(spread_list)
+    except : spread_value = 0
+    try : scatter_value = stat.mean(list(play_map['search_map'].values()))
+    except : scatter_value = scatter_value = 0
+    return 0.30*spread_value + 0.30*sector_value + 0.15*length_value + 0.25*scatter_value
 
-def torpedo_area(center) :
-    ref_position = center
-    current_position = ref_position
-    direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
-    torpedo_area = []
-    torpedo_range = 4
-    range_, try_, max_try = 0, 0, torpedo_range**6
-    while True :
-        try_ += 1
-        range_ += 1
-        current_direction = random.choice(direction)
-        current_position = add_tuple(current_position,current_direction[0])
-        if blocking(current_position) :
-            current_position = ref_position
-            range_ = 0
-            continue
-        if current_position not in torpedo_area and current_position != ref_position :
-            torpedo_area.append(current_position)
-            current_position = ref_position
-            try_ = 0
-            range_ = 0
-        if range_ == torpedo_range : 
-            current_position = ref_position
-            range_ = 0
-        if try_ == max_try or len(torpedo_area) == 40 : return torpedo_area
+def hunting() :
+    return 0
 
 " SEARCH MAP"
 
 def config_search_map(play_map) :
-    
     if not play_map['direction_path'] : raise Exception('there no direction path')
     positiv_result = 0
     poll_rate = constant['sampling']
@@ -515,10 +510,8 @@ def run_path(tile, play_map) :
     fork_map = copy.deepcopy(config_fork_map(play_map))
     cursor = initial_cursor(play_map, fork_map, tile)
     controller = {'blocking' : False,  'end_path' : False, 'stop' : True}
-    search_map = 0 # possible path for this tile
-    
+    search_map = 0.00 # possible path for this tile
     while True :
-        
         "A : embranchement : "
         if fork_map['fork'].get(cursor['idx']) :
             fork_map = update_fork_map(cursor['idx'], fork_map)
@@ -530,7 +523,7 @@ def run_path(tile, play_map) :
 
         if 'debug_run_path' in debug : debug_run_path(controller, cursor, fork_map, tile)
             
-        if controller['end_path'] == True and controller['blocking'] == False : search_map += 1
+        if controller['end_path'] == True and controller['blocking'] == False : search_map += 1.00
         
         if controller['stop'] == False :
             if controller['blocking'] == True or controller['end_path'] == True :
@@ -539,7 +532,6 @@ def run_path(tile, play_map) :
         else :
             if controller['blocking'] == True or controller['end_path'] == True :
                 return search_map
-        
         cursor = update_cursor(cursor, play_map, fork_map)
 
 # cursor
@@ -601,32 +593,6 @@ def update_fork_map(fork, fork_map):
             fork_map['fork'][fork] += 1    
         except KeyError : break
     return fork_map
-    
-# game reading 
-
-def scatter(play_map) :
-    spread_list = []
-    sector_list = []
-    for key in play_map['search_map'].keys() :
-        sector_list.append(sector(key))
-        if play_map['search_map'][key] == 1 :
-            cursor_list = [add_tuple(key, tiles) for tiles in neighbor_tiles]
-            count = 0
-            for cursor in cursor_list :
-                try : play_map['search_map'][cursor]
-                except KeyError : continue
-                if play_map['search_map'][cursor] == 1 : count += 1
-                spread_list.append(1 - (0.1 * count) if count >= 2 else 1)
-    sector_value = math.log(len(set(sector_list)) + 1, 10)
-    length_value = math.sin(play_map['direction_path_length'] * (math.pi / 2) / constant['max_length'])
-    try : spread_value = stat.mean(spread_list)
-    except : spread_value = 0
-    try : scatter_value = stat.mean(list(play_map['search_map'].values()))
-    except : scatter_value = scatter_value = 0
-    return 0.30*spread_value + 0.30*sector_value + 0.15*length_value + 0.25*scatter_value
-
-def hunting() :
-    return 0
 
 " GAME LOOP MANAGER "
 
@@ -680,7 +646,33 @@ def manage_order(order, sonar_result, his_play_map, my_play_map) :
             elif sonar_result[1] == 'N' : his_play_map['sector_out'][lap - 1] = sonar_result[0]
     return update_play_map(his_play_map, my_play_map)
 
-" STEP OF THE GAME "
+def torpedo_area(center) :
+    ref_position = center
+    current_position = ref_position
+    direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
+    torpedo_area = []
+    torpedo_range = 4
+    range_, try_, max_try = 0, 0, torpedo_range**6
+    while True :
+        try_ += 1
+        range_ += 1
+        current_direction = random.choice(direction)
+        current_position = add_tuple(current_position,current_direction[0])
+        if blocking(current_position) :
+            current_position = ref_position
+            range_ = 0
+            continue
+        if current_position not in torpedo_area and current_position != ref_position :
+            torpedo_area.append(current_position)
+            current_position = ref_position
+            try_ = 0
+            range_ = 0
+        if range_ == torpedo_range : 
+            current_position = ref_position
+            range_ = 0
+        if try_ == max_try or len(torpedo_area) == 40 : return torpedo_area
+
+
 
 def play(my_play_map, his_play_map) :
     # calculer play_map['target']
@@ -706,20 +698,7 @@ def play(my_play_map, his_play_map) :
     play_map = update_play_map(my_play_map, his_play_map)
     return  my_play_map, his_play_map
 
-def game_loop(my_play_map, his_play_map) : # nouveau
-    global lap
-    lap = 0
-    my_play_map['status'] = 'game_loop'
-    his_play_map['status'] = 'game_loop'
-    while lap < constant['max_laps'] :
-        print(lap)
-        sonar_result, his_order, my_submarine = game_input(his_play_map, my_play_map)
-        
-        his_play_map = manage_order(his_order, sonar_result, his_play_map, my_play_map)
-        
-        #my_play_map = play(my_play_map, his_play_map)     
-        
-        lap += 1
+" STEP OF THE GAME "
 
 def start() : # nouveau
     my_play_map = init_play_map('me', 'start')
@@ -734,6 +713,18 @@ def start() : # nouveau
         his_play_map = next_tile(his_play_map, 'start')
         print(f"his_start tile : {his_play_map['position']}")
     return my_play_map, his_play_map
+
+def game_loop(my_play_map, his_play_map) : # nouveau
+    global lap
+    lap = 0
+    my_play_map['status'] = 'game_loop'
+    his_play_map['status'] = 'game_loop'
+    while lap < constant['max_laps'] :
+        print(lap)
+        sonar_result, his_order, my_submarine = game_input(his_play_map, my_play_map)
+        his_play_map = manage_order(his_order, sonar_result, his_play_map, my_play_map)
+        #my_play_map = play(my_play_map, his_play_map)     
+        lap += 1
 
 def main(): ### nouveau
     config_constant()
@@ -753,10 +744,11 @@ def main(): ### nouveau
     if debug : print(f'time : {round(perf_counter() - start_time,2)}')
 
 if __name__ == '__main__' : main()
-"""
-2 - verifier le comportement de play_map et en particulier de search_map
 
-3 - verifier comportement de fork_map dans search_map
+"""
+2 verifier search_map en particulier la statistique
+
+3 verrifier fork_map
 
 verrifier dans my_scatter si c'est normal qu'il y ai eu des erreurs à stat.mean
 tester tous les ordres
