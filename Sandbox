@@ -47,9 +47,9 @@ def start() :
     start_tile = my_play_map['position']
     if not debug :
         print(*start_tile, sep = ' ')  
-    elif ('debug_path' or 'debug_map') in debug in debug :
+    elif 'debug_path' in debug or 'debug_map' in debug :
         print(f'my_start_tile : {start_tile}')
-        his_play_map = next_tile(his_play_map, 'start')
+        his_play_map = next_tile(his_play_map)
         print(f"his_start tile : {his_play_map['position']}")
     return my_play_map, his_play_map
 
@@ -244,7 +244,7 @@ def next_tile(play_map) :
     play_map['next_direction_paths'] = best['direction_path']
     play_map['next_directions'] = best['next_direction']
         
-    if play_map['status'] == 'start' or ('debug_map' or 'debug_path') in debug : 
+    if play_map['status'] == 'start' or 'debug_map' in debug or 'debug_path' in debug : 
         idx = random.randint(0, constant['stacking'])
         play_map['position'] = random.choice(best['search_area'][idx])
     return play_map
@@ -272,7 +272,7 @@ def best_random_path(play_map) :
         
         temp_play_map = evaluate_dir_map(play_map, temp_play_map)
 
-        if play_map['status'] == 'debug_random_path' or ('debug_map'or 'debug_path') in  debug :
+        if play_map['status'] == 'debug_random_path' or 'debug_map' in debug or 'debug_path' in debug :
             if temp_play_map['value'] > test_value :
                 test_value = temp_play_map['value']
                 time = perf_counter() - start_time
@@ -377,7 +377,7 @@ def hunting() :
 
 def config_search_map(play_map) :
     if not play_map['direction_path'] : raise Exception('there no direction path')
-    positiv_result = 0
+    positiv_result, tested_tile = 0, 0
     poll_rate = constant['sampling']
     non_tested, sample, temp_search_area = [], [], []
 
@@ -386,17 +386,18 @@ def config_search_map(play_map) :
             non_tested, sample = train_test_split(play_map['search_area'], test_size=constant['sampling'])
         else : sample = play_map['search_area']
         for tile in sample :
-            if off_side_max(tile, play_map) :
+            if off_side_max(tile, play_map) and not 'debug_random_path':
                 play_map['search_map'][tile] = 0 
             else :  
                 result = run_path(tile, play_map)
                 play_map['search_map'][tile] = result
                 positiv_result += result
+                tested_tile += 1
                 if result : temp_search_area.append(tile)
-        positive_rate = round(len(temp_search_area) / game_map['nb_tile'], 2)
+        positive_rate =  round(positiv_result / tested_tile, 2)
         if  positive_rate > 1 - poll_rate or not non_tested :
             for tile in non_tested : play_map['search_map'][tile] = positive_rate
-            play_map['search_area'] = temp_search_area
+            play_map['search_area'] = [*temp_search_area, *non_tested]
             play_map['positive_rate'] = positive_rate
             return play_map
         else : 
@@ -606,7 +607,6 @@ def config_global_var():
     global status_list, neighbor_tiles, play_map_keys
     status_list    = ['start', 'game_loop', 'next_tile', 'config_global_var', 'debug_random_path']
     play_map_keys  = list(init_play_map('debug', 'config_global_var').keys())
-    if ('debug_map' or 'debug_path') in debug : play_map_keys.append('temp_search_map')
     neighbor_tiles = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)]
 
 def debug_menu(test_mod           = False,    random_path     = False,
@@ -626,7 +626,6 @@ def debug_menu(test_mod           = False,    random_path     = False,
     
     debug = key if test_mod else []
 
-
 def check_search_map() :
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
     
@@ -644,21 +643,23 @@ def debug_map(test_play_map) :
     path can start on the map. This is the graphic result. 
     In game loop show where the submarine could be on the map 
     """
-    print(f"debug_map in next_tile() at debug_map")
+
+    print("debug_map in next_tile() at debug_map")
     for y in range(game_map['size']):
         line = []
         for x in range(game_map['size']):
-            try : line.append(f"{int(test_play_map['temp_search_map'][x,y]*100):03}" 
-                              if (test_play_map['search_map'][x,y] == 1 or test_play_map['search_map'][x,y] == 0) 
-                              else '___')
-            except KeyError : line.append('XXX')
-        print(*line, sep=' ')  
-    print(f"possible tile rate : {test_play_map['positive_rate']}")
+            try : line.append(f"_{int(test_play_map['search_map'][x,y])}" 
+                              if test_play_map['search_map'][x,y] == 1 or test_play_map['search_map'][x,y] == 0
+                              else f"{int(test_play_map['search_map'][x,y]*100):02}")
+            except KeyError : line.append('XX')
+        print(*line, sep=' ') 
+    sample_size = len([i for i in test_play_map['search_map'].values() if i == 0 or i == 1])
+    print(f"positive rate : {test_play_map['positive_rate']} sample_size : {sample_size}")
     return
 
 def debug_path(test_play_map) :
     if 'debug_path' in debug :
-        print(f"debug_path in debug_path")
+        print("debug_path in debug_path")
     tile_cursor = (0,0)
     path_cursor = [tile_cursor]
     for direction in test_play_map['direction_path'] :
