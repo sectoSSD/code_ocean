@@ -250,6 +250,7 @@ def next_tile(play_map) :
 
 def best_random_path(play_map) :
     try_, test_value, min_value = 0, -1, -1
+    metrics, test = {}, {}
     keys_list = ['value', 'search_map', 'search_area', 'positive_rate', 'direction_path', 
                  'next_direction']
     best = {key : [] for key in keys_list}
@@ -270,18 +271,9 @@ def best_random_path(play_map) :
             play_map['next_direction_paths'].pop(0)
         
         temp_play_map = evaluate_dir_map(play_map, temp_play_map)
+        
+        test_value, metrics, test = debug_input(start_time, try_, test_value, play_map, temp_play_map, metrics, test)
 
-        if play_map['status'] == 'debug_random_path' or 'debug_map' in debug or 'debug_path' in debug :
-            if temp_play_map['value'] > test_value :
-                test_value = temp_play_map['value']
-                time = perf_counter() - start_time
-                metrics = {'direction_path' : temp_play_map['direction_path'], 'path_value' : temp_play_map['value'], 
-                           'process_time' : time, 'path_length' :temp_play_map['direction_path_length'],
-                           'swing_turn' :  try_ }
-                test = {'direction_path' : temp_play_map['direction_path'], 
-                        'search_map' : temp_play_map['search_map'], 
-                        'positive_rate' : temp_play_map['positive_rate']}
-                
         best['max_length'] = (temp_play_map['direction_path_length'] 
                       if temp_play_map['direction_path_length'] > best['max_length']
                       else best['max_length'])
@@ -370,6 +362,20 @@ def scatter(play_map) :
 
 def hunting() :
     return 0
+
+def debug_input(start_time, test_value, try_, play_map, temp_play_map, metrics, test) :
+    if play_map['status'] == 'debug_random_path' or 'debug_map' in debug or 'debug_path' in debug :
+        if temp_play_map['value'] > test_value :
+
+            test_value = temp_play_map['value']
+            time = perf_counter() - start_time
+            metrics = {'direction_path' : temp_play_map['direction_path'], 'path_value' : temp_play_map['value'], 
+                       'process_time' : time, 'path_length' :temp_play_map['direction_path_length'],
+                       'swing_turn' :  try_ }
+            test = {'direction_path' : temp_play_map['direction_path'], 
+                    'search_map' : temp_play_map['search_map'], 
+                    'positive_rate' : temp_play_map['positive_rate']}
+    return test_value, metrics, test
 
 " SEARCH MAP"
 
