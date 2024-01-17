@@ -1,6 +1,4 @@
 """
-2 verifier search_map en particulier la statistique
-
 3 verrifier fork_map
 
 verrifier dans my_scatter si c'est normal qu'il y ai eu des erreurs à stat.mean
@@ -336,17 +334,14 @@ def random_path(initial_play_map) :
                     else : break
 
 def evaluate_dir_map(play_map, temp_play_map) :
-    
-    all_random_dir_map = ( [*play_map['direction_path'],*temp_play_map['direction_path']] 
-                           if play_map['direction_path'] 
-                           else temp_play_map['direction_path'])
+    temp_play_map['direction_path'] = ([*play_map['direction_path'],*temp_play_map['direction_path']] 
+                                       if play_map['direction_path'] 
+                                       else temp_play_map['direction_path'])
     temp_play_map = config_search_map(temp_play_map)
     
     hiding_value = scatter(temp_play_map)
     hunting_value = hunting()
-    
     temp_play_map['value'] = round( (1-play_map['target']) * hiding_value + play_map['target'] * hunting_value, 2)
-    
     return temp_play_map
 
 def scatter(play_map) :
