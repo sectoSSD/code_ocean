@@ -60,7 +60,7 @@ def game_loop(my_play_map, his_play_map) :
     while lap < constant['max_laps'] :
         print(lap)
         my_play_map, his_play_map, sonar_result, his_order = game_input(his_play_map, my_play_map)
-        his_play_map = manage_order(his_order, sonar_result, his_play_map, my_play_map)
+        his_play_map = manage_order(his_order, sonar_result, my_play_map, his_play_map)
         #my_play_map = play(my_play_map, his_play_map)     
         lap += 1
 
@@ -94,9 +94,9 @@ def game_input(my_play_map, his_play_map) :
         his_play_map['position'] = add_tuple(his_play_map['position'], next_direction[0])
     return my_play_map, his_play_map, sonar_result, his_order
 
-def manage_order(order, sonar_result, his_play_map, my_play_map) :
+def manage_order(his_order, sonar_result, my_play_map, his_play_map) :
     ### direction must be append at the beginning in dir path
-    message_order = [cursor.split() for cursor in order.split('|')]
+    message_order = [cursor.split() for cursor in his_order.split('|')]
     for order_cursor in message_order :
         if order_cursor[0] == 'MOVE' : 
             his_play_map['direction_path'].append( dir_converter(order_cursor[1]) )
@@ -170,7 +170,8 @@ def torpedo_area(center) :
 " PLAY MAP"
 
 def init_play_map(who,status) :
-    if who not in ['he','me', 'debug'] : raise Exception(f"{who} is not valid")
+    global init_play_key
+    if who not in who_list : raise Exception(f"{who} is not valid")
     if status not in status_list : raise Exception(f"{status} is not valid")
     play_map = {'who'                       : who,
                 'status'                    : status,
@@ -207,6 +208,7 @@ def init_play_map(who,status) :
                          'next_directions'           : list(),
                          'next_direction_paths'      : list(),
                          'max_length_direction_path' : int()})
+    init_play_key = list(play_map)
     return play_map
 
 def config_temp_play_map(direction_path, next_direction) :
@@ -224,9 +226,11 @@ def config_temp_play_map(direction_path, next_direction) :
             }
 
 def update_play_map(play_map, opp_play_map) :
-    if any(key not in play_map_keys for key in list(play_map.keys())) : 
-        raise Exception("unknown keys in play_map")
-    if play_map['who'] not in ['he','me']    : raise Exception(f"{play_map['who']} is not valid")
+    if any(key not in init_play_key for key in play_map) : raise Exception("unknown keys in play_map")
+    if play_map['who'] not in who_list    : raise Exception(f"{play_map['who']} is not valid")
+    
+    
+    
     if play_map['status'] not in status_list : raise Exception(f"{play_map['status']} is not valid")
     if not debug and play_map['who'] == 'he' and play_map['position'] : 
         raise Exception("he can't have play_map['position']")
@@ -339,7 +343,7 @@ def evaluate_dir_map(play_map, temp_play_map) :
 def scatter(play_map) :
     spread_list = []
     sector_list = []
-    for key in play_map['search_map'].keys() :
+    for key in play_map['search_map'] :
         sector_list.append(sector(key))
         if play_map['search_map'][key] == 1 :
             cursor_list = [add_tuple(key, tiles) for tiles in neighbor_tiles]
@@ -524,11 +528,15 @@ def config_game_map() :
 " TOOLS"
 
 def config_global_var():
-    global status_list, neighbor_tiles, play_map_keys, sampling_floor
+    global status_list, who_list, neighbor_tiles, play_map_keys, sampling_floor
     status_list    = ['start', 'game_loop', 'next_tile', 'config_global_var', 'debug_random_path']
-    play_map_keys  = list(init_play_map('debug', 'config_global_var').keys())
+    who_list = ['he','me', 'debug']
+    play_map_keys  = list(init_play_map('debug', 'config_global_var'))
     neighbor_tiles = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)]
     sampling_floor = 1/4 * len(game_map['sea'])
+
+
+
 
 def add_tuple (tuple_1, tuple_2) :
     return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
@@ -603,9 +611,9 @@ def blocking(tile, play_map, index = None) :
     return blocking
 
 def stop(fork_map) :
-    if len(fork_map['fork'].keys()) != len(fork_map['max'].keys()) : 
+    if len(fork_map['fork']) != len(fork_map['max']) : 
         raise ValueError('fork_map')
-    if (len(fork_map['fork'].keys()) == 1 and 
+    if (len(fork_map['fork']) == 1 and 
         list(fork_map['fork'].values()) == list(fork_map['max'].values())) :
         return True
     else : return False
@@ -739,7 +747,7 @@ def debug_random_path() :
             except KeyError : pass
         metric['path_spread'].append(debug_path(temp['direction_path'], status = 'debug_random_path'))
         count += 1
-    for key in list(metric.keys()) : print(f'{label[key]:7s} : ({round(stat.mean(metric[key]), 2):.2f}, {round(stat.pstdev(metric[key]), 2):.2f}), ({color[key]})')
+    for key in metric : print(f'{label[key]:7s} : ({round(stat.mean(metric[key]), 2):.2f}, {round(stat.pstdev(metric[key]), 2):.2f}), ({color[key]})')
     
     turn = list(range(constant['num_test']))
     fig, ax1 = plt.subplots(layout='constrained')
