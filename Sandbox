@@ -11,9 +11,9 @@ def main():
     config_constant()
     config_global_var()
     debug_menu(test_mod          = True,       random_path    = False,
-               debug_run_path    = False,      debug_path     = True,
-               check_search_map  = False,      debug_map      = True,
-               start             = True,       game_loop      = False)
+               debug_run_path    = False,      debug_path     = False,
+               check_search_map  = False,      debug_map      = False,
+               start             = True,       game_loop      = True)
     config_game_map()
     if 'random_path' in debug : return debug_random_path()
     if 'check_search_map' in debug : return check_search_map()
@@ -167,9 +167,23 @@ def torpedo_area(center) :
             range_ = 0
         if try_ == max_try or len(torpedo_area) == 40 : return torpedo_area
 
-def config_heat_map(opp_play_map) :
-    
-    return
+def config_heat_map(play_map, opp_play_map) :
+    for main_tile in game_map['sea'] :
+        if opp_play_map[main_tile] == 1 :
+            for rang_ in range(5) :
+                for swing_tile in tile_range[rang_] :
+                    key = add_tuple(main_tile, swing_tile)
+                    value = opp_play_map[main_tile] / rang_
+                    try : play_map['heat_map'][key] = value
+                    except KeyError : pass
+    print('heat_map')
+    for x in range(15) :
+        line = []
+        for y in range(15) :
+            try : line.append(play_map['heat_map'][(x,y)])
+            except : 'xx' 
+        print(line)
+    return play_map
 
 " PLAY MAP"
 
@@ -364,7 +378,7 @@ def scatter(play_map) :
 
 def hunting(temp_play_map, play_map) :
     if not play_map['opp_heat_map'] : return 0
-    mean = stat.mean(play_map['search_map'].values())
+
 
 def debug_input(start_time, test_value, try_, play_map, temp_play_map, metrics, test) :
     if play_map['status'] == 'debug_random_path' or 'debug_map' in debug or 'debug_path' in debug :
@@ -528,10 +542,11 @@ def config_game_map() :
 " TOOLS"
 
 def config_global_var():
-    global status_list, who_list, neighbor_tiles, sampling_floor
+    global status_list, who_list, neighbor_tiles, tile_range, sampling_floor
     status_list    = ['start', 'game_loop', 'next_tile', 'config_global_var', 'debug_random_path']
     who_list = ['he','me', 'debug']
     neighbor_tiles = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)]
+    tile_range = config_tile_range()
     sampling_floor = 1/4 * len(game_map['sea'])
 
 def add_tuple (tuple_1, tuple_2) :
@@ -551,6 +566,12 @@ def extending(direction_path) :
         n_s = sum([xy[0][1] for xy in direction_path if len(xy) == 1]) 
         return e_w, n_s
     else : return (0,0)
+
+def config_tile_range() :
+    tile_range = {}
+    for key in range(1,5) :
+        tile_range[key] = [(x,y) for x in range(-key, key+1) for y in range(-key, key+1) if abs(x) + abs(y) == key]
+    return tile_range
 
 def off_side_max(tile, play_map) :
     size = game_map['size']
