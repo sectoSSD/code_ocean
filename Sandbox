@@ -236,23 +236,9 @@ def update_play_map(play_map, opp_play_map) :
 " NEXT TILE"
 
 def next_tile(play_map) :
-
-    best = best_random_path(play_map)
-    
-    play_map['max_length_next_path'] = best['max_length']
-    play_map['next_direction_paths'] = best['direction_path']
-    play_map['next_directions'] = best['next_direction']
-        
-    if play_map['status'] == 'start' or 'debug_map' in debug or 'debug_path' in debug : 
-        idx = random.randint(0, constant['stacking'])
-        play_map['position'] = random.choice(best['search_area'][idx])
-    return play_map
-
-def best_random_path(play_map) :
     try_, test_value, min_value = 0, -1, -1
     metrics, test = {}, {}
-    keys_list = ['value', 'search_map', 'search_area', 'positive_rate', 'direction_path', 
-                 'next_direction']
+    keys_list = ['value', 'search_map', 'search_area', 'positive_rate', 'direction_path', 'next_direction']
     best = {key : [] for key in keys_list}
     best['max_length'] = 0
     max_time = constant['start_time'] if play_map['status'] == 'start' else constant['turn_time']
@@ -290,10 +276,18 @@ def best_random_path(play_map) :
                     min_value = best['value'][-1]
         try_ += 1
         open_1 = perf_counter() - start_time < max_time or play_map['next_direction_paths'] 
+    
     if play_map['status'] == 'debug_random_path' : return metrics
     if 'debug_map' in debug and play_map['who'] == 'me' : debug_map(test)
     if 'debug_path' in debug and play_map['who'] == 'me' : debug_path(test)
-    return best
+    play_map['max_length_next_path'] = best['max_length']
+    play_map['next_direction_paths'] = best['direction_path']
+    play_map['next_directions'] = best['next_direction']
+        
+    if play_map['status'] == 'start' or 'debug_map' in debug or 'debug_path' in debug : 
+        idx = random.randint(0, constant['stacking'])
+        play_map['position'] = random.choice(best['search_area'][idx])
+    return play_map
 
 def random_path(initial_play_map) :
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
@@ -734,7 +728,7 @@ def debug_random_path() :
     color = dict(zip(indicator, color))
     metric = {key : [] for key in indicator}
     while count != constant['num_test'] :
-        temp = best_random_path(test_play_map) 
+        temp = next_tile(test_play_map) 
         for key in indicator : 
             try : metric[key].append(temp[key])
             except KeyError : pass
