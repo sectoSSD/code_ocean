@@ -1,5 +1,7 @@
 """
-3 verrifier fork_map
+verrifier fork_map
+
+ecrire hungtig _value 
 
 verrifier dans my_scatter si c'est normal qu'il y ai eu des erreurs à stat.mean
 tester tous les ordres
@@ -41,7 +43,6 @@ def start() :
     my_play_map = init_play_map('me', 'start')
     his_play_map = init_play_map('he', 'start')
     my_play_map = next_tile(my_play_map)
-    print(f" my_position : {my_play_map['position']}")
     start_tile = my_play_map['position']
     if not debug :
         print(*start_tile, sep = ' ')  
@@ -298,8 +299,8 @@ def best_random_path(play_map) :
         try_ += 1
         open_1 = perf_counter() - start_time < max_time or play_map['next_direction_paths'] 
     if play_map['status'] == 'debug_random_path' : return metrics
-    if 'debug_map' in debug : debug_map(test)
-    if 'debug_path' in debug : debug_path(test)
+    if 'debug_map' in debug and play_map['who'] == 'me' : debug_map(test)
+    if 'debug_path' in debug and play_map['who'] == 'me' : debug_path(test)
     return best
 
 def random_path(initial_play_map) :
@@ -359,10 +360,12 @@ def scatter(play_map) :
                 spread_list.append(1 - (0.1 * count) if count >= 2 else 1)
     sector_value = math.log(len(set(sector_list)) + 1, 10)
     length_value = math.sin(play_map['direction_path_length'] * (math.pi / 2) / constant['max_length'])
-    try : spread_value = stat.mean(spread_list)
-    except : spread_value = 0
-    try : scatter_value = stat.mean(list(play_map['search_map'].values()))
-    except : scatter_value = scatter_value = 0
+    #try : spread_value = stat.mean(spread_list)
+    #except : spread_value = 0
+    #try : scatter_value = stat.mean(list(play_map['search_map'].values()))
+    #except : scatter_value = scatter_value = 0
+    spread_value = stat.mean(spread_list)
+    scatter_value = stat.mean(list(play_map['search_map'].values()))
     return 0.30*spread_value + 0.30*sector_value + 0.15*length_value + 0.25*scatter_value
 
 def hunting() :
@@ -374,10 +377,10 @@ def config_search_map(play_map) :
     if not play_map['direction_path'] : raise Exception('there no direction path')
     positiv_result, tested_tile = 0, 0
     poll_rate = constant['sampling']
-    non_tested, sample, temp_search_area = [], [], []
+    sample, temp_search_area = [], []
 
     while True :
-        if play_map['status'] != 'start' :
+        if play_map['status'] != 'start' or len(play_map['search_area']) < sampling_floor :
             non_tested, sample = train_test_split(play_map['search_area'], test_size=constant['sampling'])
         else : sample = play_map['search_area']
         for tile in sample :
@@ -511,10 +514,16 @@ def config_game_map() :
             num_island = random.choices([i for i in range(11)], weights)
             island = random.sample(tiles, *num_island)
         sea = [xy for xy in tiles if xy not in island]
-    game_map = {'island' : island, 'size' : size, 'nb_tile' : size**2,'sea' : sea, 'IA start' : bool(my_id)}
-
+    game_map = {'island' : island, 'size' : size,'sea' : sea, 'IA start' : bool(my_id)}
 
 " TOOLS"
+
+def config_global_var():
+    global status_list, neighbor_tiles, play_map_keys, sampling_floor
+    status_list    = ['start', 'game_loop', 'next_tile', 'config_global_var', 'debug_random_path']
+    play_map_keys  = list(init_play_map('debug', 'config_global_var').keys())
+    neighbor_tiles = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)]
+    sampling_floor = 1/4 * len(game_map['sea'])
 
 def add_tuple (tuple_1, tuple_2) :
     return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
@@ -597,12 +606,6 @@ def stop(fork_map) :
     else : return False
 
 " DEBUG"
-
-def config_global_var():
-    global status_list, neighbor_tiles, play_map_keys
-    status_list    = ['start', 'game_loop', 'next_tile', 'config_global_var', 'debug_random_path']
-    play_map_keys  = list(init_play_map('debug', 'config_global_var').keys())
-    neighbor_tiles = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)]
 
 def debug_menu(test_mod           = False,    random_path     = False,
                debug_run_path     = False,    debug_path      = False,
