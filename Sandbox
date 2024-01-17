@@ -167,10 +167,13 @@ def torpedo_area(center) :
             range_ = 0
         if try_ == max_try or len(torpedo_area) == 40 : return torpedo_area
 
+def config_heat_map(opp_play_map) :
+    
+    return
+
 " PLAY MAP"
 
 def init_play_map(who,status) :
-    global init_play_key
     if who not in who_list : raise Exception(f"{who} is not valid")
     if status not in status_list : raise Exception(f"{status} is not valid")
     play_map = {'who'                       : who,
@@ -208,7 +211,7 @@ def init_play_map(who,status) :
                          'next_directions'           : list(),
                          'next_direction_paths'      : list(),
                          'max_length_direction_path' : int()})
-    init_play_key = list(play_map)
+    play_map['key_list'] = list(play_map)
     return play_map
 
 def config_temp_play_map(direction_path, next_direction) :
@@ -222,22 +225,20 @@ def config_temp_play_map(direction_path, next_direction) :
             'search_map'               : dict(),
             'search_area'              : game_map['sea'],
             'positive_rate'            : int(),
-            'value'                    : int()
-            }
+            'value'                    : int()}
 
 def update_play_map(play_map, opp_play_map) :
-    if any(key not in init_play_key for key in play_map) : raise Exception("unknown keys in play_map")
+    # checking :
+    for key in play_map : 
+        if key not in play_map['key_list'] : raise Exception(f"unknown keys in play_map : {key}")
     if play_map['who'] not in who_list    : raise Exception(f"{play_map['who']} is not valid")
-    
-    
-    
     if play_map['status'] not in status_list : raise Exception(f"{play_map['status']} is not valid")
-    if not debug and play_map['who'] == 'he' and play_map['position'] : 
-        raise Exception("he can't have play_map['position']")
+    # updating :
     play_map['direction_path_length'] = len(play_map['direction_path'])
     play_map['direction_path_extending'] = extending(play_map['direction_path'])
     play_map['fork'] = [idx for idx in range(len(play_map['direction_path'])) if len(play_map['direction_path'][idx]) != 1]
     play_map['search_map'] = config_search_map(play_map)
+    play_map['opp_heat_map'] = config_heat_map(opp_play_map)
     if not play_map['search_area'] : play_map['search_area'] = game_map['sea']
     if play_map['position'] not in play_map['last_tiles'] : play_map['last_tiles'].append(play_map['position'])
     return play_map
@@ -355,16 +356,15 @@ def scatter(play_map) :
                 spread_list.append(1 - (0.1 * count) if count >= 2 else 1)
     sector_value = math.log(len(set(sector_list)) + 1, 10)
     length_value = math.sin(play_map['direction_path_length'] * (math.pi / 2) / constant['max_length'])
-    #try : spread_value = stat.mean(spread_list)
-    #except : spread_value = 0
-    #try : scatter_value = stat.mean(list(play_map['search_map'].values()))
-    #except : scatter_value = scatter_value = 0
-    spread_value = stat.mean(spread_list)
-    scatter_value = stat.mean(list(play_map['search_map'].values()))
+    try : spread_value = stat.mean(spread_list)
+    except : spread_value = 0
+    try : scatter_value = stat.mean(list(play_map['search_map'].values()))
+    except : scatter_value = 0
     return 0.30*spread_value + 0.30*sector_value + 0.15*length_value + 0.25*scatter_value
 
 def hunting(temp_play_map, play_map) :
     if not play_map['opp_heat_map'] : return 0
+    mean = stat.mean(play_map['search_map'].values())
 
 def debug_input(start_time, test_value, try_, play_map, temp_play_map, metrics, test) :
     if play_map['status'] == 'debug_random_path' or 'debug_map' in debug or 'debug_path' in debug :
@@ -528,15 +528,11 @@ def config_game_map() :
 " TOOLS"
 
 def config_global_var():
-    global status_list, who_list, neighbor_tiles, play_map_keys, sampling_floor
+    global status_list, who_list, neighbor_tiles, sampling_floor
     status_list    = ['start', 'game_loop', 'next_tile', 'config_global_var', 'debug_random_path']
     who_list = ['he','me', 'debug']
-    play_map_keys  = list(init_play_map('debug', 'config_global_var'))
     neighbor_tiles = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)]
     sampling_floor = 1/4 * len(game_map['sea'])
-
-
-
 
 def add_tuple (tuple_1, tuple_2) :
     return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
@@ -598,16 +594,14 @@ def blocking(tile, play_map, index = None) :
     if play_map['status'] == 'next_tile' :
         blocking = True if tile in game_map['island'] or off_side_tile(tile) else False
     else :
-
-        blocking = (    True 
-                        if tile in game_map['island'] 
-                        or off_side_tile(tile) 
-                        or ( play_map['sector_in'].get(index) 
-                                and play_map['sector_in'].get(index) != sector(tile) )
-                        or ( play_map['sector_out'].get(index)
-                             and tile not in play_map['sector_out'].get(index) )
-                        else False
-                    )
+        blocking = (True 
+                    if tile in game_map['island'] 
+                    or off_side_tile(tile) 
+                    or ( play_map['sector_in'].get(index) 
+                            and play_map['sector_in'].get(index) != sector(tile) )
+                    or ( play_map['sector_out'].get(index)
+                         and tile not in play_map['sector_out'].get(index) )
+                    else False)
     return blocking
 
 def stop(fork_map) :
