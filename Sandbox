@@ -60,7 +60,6 @@ def game_loop(my_play_map, his_play_map) :
     his_play_map['status'] = 'game_loop'
     while lap < constant['max_laps'] :
         print(lap)
-        print(his_play_map)
         my_play_map, his_play_map, sonar_result, his_order = game_input(my_play_map, his_play_map)
         his_play_map = manage_order(his_order, sonar_result, my_play_map, his_play_map)
         #my_play_map = play(my_play_map, his_play_map)     
@@ -256,7 +255,7 @@ def update_play_map(play_map, opp_play_map) :
     play_map['direction_path_length'] = len(play_map['direction_path'])
     play_map['direction_path_extending'] = extending(play_map['direction_path'])
     play_map['fork'] = [idx for idx in range(len(play_map['direction_path'])) if len(play_map['direction_path'][idx]) != 1]
-    play_map['search_map'] = config_search_map(play_map)
+    play_map = config_search_map(play_map)
     play_map['opp_heat_map'] = config_heat_map(opp_play_map)
     if not play_map['search_area'] : play_map['search_area'] = game_map['sea']
     if play_map['position'] not in play_map['last_tiles'] : play_map['last_tiles'].append(play_map['position'])
@@ -554,8 +553,7 @@ def config_global_var():
     status_list    = ['start', 'game_loop', 'next_tile', 'config_global_var', 'debug_random_path']
     who_list = ['he','me', 'debug']
     neighbor_tiles = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)]
-    # tile_range = config_tile_range()
-    sampling_floor = 1/4 * len(game_map['sea'])
+    sampling_floor = 1/4 * (15*15)
 
 def add_tuple (tuple_1, tuple_2) :
     return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
