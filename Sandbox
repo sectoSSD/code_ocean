@@ -10,14 +10,15 @@ tester tous les ordres
 def main():
     config_constant()
     config_global_var()
-    debug_menu(test_mod          = True,       random_path    = False,      no_sampling = False,
-               debug_run_path    = False,      debug_path     = False,
-               check_search_map  = False,      debug_map      = False,
+    debug_menu(test_mod          = True,       no_sampling = False,      test_random_path  = False ,
+               debug_run_path    = False,      debug_path     = False,   debug_random_path = False,     
+               check_search_map  = False,      debug_map      = False, 
                start             = True,       game_loop      = True)
     
     config_game_map()
-    if 'random_path' in debug : return debug_random_path()
-    if 'check_search_map' in debug : return check_search_map()
+    if 'debug_random_path' in debug : return debug_random_path()
+    if 'test_random_path'  in debug : return test_random_path()
+    if 'check_search_map'  in debug : return check_search_map()
     start_time = perf_counter()
     if not debug or 'start' in debug : 
         my_play_map, his_play_map = start()
@@ -187,7 +188,7 @@ def config_heat_map(opp_play_map) :
     sm_mean = stat.mean(opp_play_map['search_map'].values())
     opp_heat_map = opp_play_map['search_map']
     for repetition in range(14) :
-        for key in opp_heat_map :
+        for key in game_map['sea'] :
             cursor_list = list(map(lambda xy : add_tuple(key,xy),[(-1,0),(0,-1),(0,1),(1,0)]))
             for cursor in cursor_list :
                 try : opp_heat_map[cursor] += opp_heat_map[key] / 14
@@ -354,7 +355,7 @@ def next_tile(play_map) :
         try_ += 1
         open_1 = perf_counter() - start_time < max_time or play_map['next_direction_paths'] 
     
-    if play_map['status'] == 'debug_random_path' : return metrics
+    if 'debug_random_path' in debug : return metrics
     if 'debug_map' in debug and play_map['who'] == 'me' : debug_map(test)
     if 'debug_path' in debug and play_map['who'] == 'me' : debug_path(test)
     play_map['max_length_direction_path'] = best['max_length']
@@ -373,15 +374,15 @@ def random_path(play_map) :
         first_direction = None
         counter = 0
         current_direction_path = []
-        current_tile = random.choice(play_map['search_area'])
-        current_tile_path = (
-                              copy.deepcopy(play_map['last_tiles']) 
-                              if play_map['last_tiles']
-                              else dir_tile_converter(play_map['direction_path'], current_tile)
-                            )
+        if (play_map['status'] == 'game_loop' and (play_map['who'] == 'he' or debug)) or 'test_random_path' in debug :
+            current_tile = play_map['position']
+        else : current_tile = random.choice(play_map['search_area'])
+        if play_map['last_tiles'] : current_tile_path = copy.deepcopy(play_map['last_tiles']) 
+        else : current_tile_path = dir_tile_converter(play_map['direction_path'], current_tile)
+        
         while True :
             temp_direction = random.choice(direction)
-            temp_tile = add_tuple(current_tile, temp_direction[0])
+            temp_tile = add_tuple(current_tile, temp_direction)
             if temp_tile not in current_tile_path and blocking(temp_tile, play_map) == False :
                 if first_direction == None : first_direction = temp_direction
                 current_direction_path.append(temp_direction)
@@ -439,7 +440,7 @@ def hunting(temp_play_map, play_map) :
     return stat.mean(hunting_value)
 
 def debug_input(start_time, test_value, try_, play_map, temp_play_map, metrics, test) :
-    if play_map['status'] == 'debug_random_path' or 'debug_map' in debug or 'debug_path' in debug :
+    if 'debug_random_path' in debug or 'debug_map' in debug or 'debug_path' in debug :
         if temp_play_map['value'] > test_value :
 
             test_value = temp_play_map['value']
@@ -584,6 +585,11 @@ def config_game_map() :
     if not debug :
         width, height, my_id = [int(i) for i in input().split()]
         size = width if width == height else Exception('width != height')
+    elif 'test_random_path' in debug :
+        size = 7
+        my_id = random.choice([0,1])
+        sea = [(1,1),(1,2),(1,3),(2,3),(3,3),(3,4),(3,5),(3,6),(4,6),(5,6),(6,6),(7,6),(7,7)]
+        island = [(x,y) for x in range(size) for y in range(size) if (x,y) not in sea]
     else : 
         my_id = random.choice([0,1])
         size = constant['size_map']
@@ -600,13 +606,13 @@ def config_game_map() :
 " TOOLS"
 
 def config_global_var():
-    global status_list, who_list, neighbor_tiles, tile_range, sampling_floor
-    status_list    = ['start', 'game_loop', 'next_tile', 'config_global_var', 'debug_random_path']
+    global status_list, who_list, neighbor_tiles, sampling_floor
+    status_list    = ['start', 'game_loop', 'next_tile', 'debug']
     who_list = ['he','me', 'debug']
     neighbor_tiles = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)]
     sampling_floor = 1/4 * (15*15)
 
-def add_tuple (tuple_1, tuple_2) :
+def add_tuple(tuple_1, tuple_2) :
     if type(tuple_1) is list and len(tuple_1) == 1 : tuple_1 = tuple_1[0]
     if type(tuple_2) is list and len(tuple_2) == 1 : tuple_2 = tuple_2[0] 
     return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
@@ -637,7 +643,7 @@ def off_side_max(tile, play_map) :
 def off_side_tile (tile) :
     size = game_map['size']
     x,y = tile
-    return (x not in range(0,size) or y not in range(0,size)) # 1 c'est pas logique
+    return (x not in range(0,size) or y not in range(0,size))
 
 def sector (xy) :
     sector = {'1': [ 0, 5, 0, 5], '2' : [ 0, 5, 5,10], '3' : [ 0, 5,10,15],
@@ -688,21 +694,23 @@ def stop(fork_map) :
 
 " DEBUG"
 
-def debug_menu(test_mod           = False,    random_path     = False, no_sampling = False,
-               debug_run_path     = False,    debug_path      = False,
-               check_search_map   = False,    debug_map       = False,
+def debug_menu(test_mod           = False,    no_sampling     = False,   test_random_path = False,
+               debug_run_path     = False,    debug_path      = False,   debug_random_path = False,
+               check_search_map   = False,    debug_map       = False,   
                start              = False,    game_loop       = False):
     global debug
     key = []
-    if test_mod         : key.append('test_mod')
-    if random_path      : key.append('random_path') 
-    if debug_run_path   : key.append('debug_run_path') 
-    if check_search_map : key.append('check_search_map')
-    if debug_map        : key.append('debug_map') 
-    if debug_path       : key.append('debug_path')
-    if start            : key.append('start')
-    if game_loop        : key.append('game_loop')
-    if no_sampling      : key.append('no_sampling')
+    if test_mod          : key.append('test_mod')
+    if no_sampling       : key.append('no_sampling')
+    if debug_run_path    : key.append('debug_run_path') 
+    if check_search_map  : key.append('check_search_map')
+    if debug_map         : key.append('debug_map') 
+    if debug_path        : key.append('debug_path')
+    if start             : key.append('start')
+    if game_loop         : key.append('game_loop')
+    if test_random_path  : key.append('test_random_path')
+    if debug_random_path : key.append('debug_random_path')
+
     
     debug = key if test_mod else []
 
@@ -799,9 +807,30 @@ def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
         if r : print(r)
         else : pass
 
+"""
+def test_random_path() :
+    play_map = init_play_map('debug', 'debug')
+    play_map['position'] = (1,1)
+    while True : 
+        test_play_map = random_path(play_map)
+        if len(test_play_map['direction_path']) == 6 : break 
+    print(test_play_map['direction_path'])
+    test_play_map['position'] = (1,1)
+    test_tile_path = dir_tile_converter(test_play_map['direction_path'], test_play_map['position'])
+    
+    for x in range(game_map['size']) :
+        line = []
+        for y in range(game_map['size']) :
+            if (x,y) in test_tile_path : 
+                line.append('*')
+            elif (x,y) in game_map['island'] : line.append('x')
+            else : line.append('_')
+        print(line)
+"""
+
 def debug_random_path() :
     import matplotlib.pyplot as plt
-    test_play_map = init_play_map('debug', 'debug_random_path')
+    test_play_map = init_play_map('debug', 'debug')
     count = 0
     indicator = ['path_value', 'process_time', 'path_length', 'swing_turn', 'path_spread']
     label = ['value', 'time', 'length', 'turn', 'spread']
@@ -814,7 +843,7 @@ def debug_random_path() :
         for key in indicator : 
             try : metric[key].append(temp[key])
             except KeyError : pass
-        metric['path_spread'].append(debug_path(temp['direction_path'], status = 'debug_random_path'))
+        metric['path_spread'].append(debug_path(temp['direction_path']))
         count += 1
     for key in metric : print(f'{label[key]:7s} : ({round(stat.mean(metric[key]), 2):.2f}, {round(stat.pstdev(metric[key]), 2):.2f}), ({color[key]})')
     
