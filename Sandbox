@@ -1,19 +1,20 @@
 """
-verrifier fork_map
+creer une clef 'next_tiles' dans config_temp_play_map, avec un parametre next_tile implementer dans random_path
+l'utiliser dans hunting
 
-ecrire hungtig _value 
-
-verrifier dans my_scatter si c'est normal qu'il y ai eu des erreurs à stat.mean
+verifier si c'est normal qu'il y ai des clef dans heat_map qui ne soit pas compatible avec les dir_paths sachant que les clefs de heat_map viennent
+ de search_map.
 tester tous les ordres
 """
 
 def main():
     config_constant()
     config_global_var()
-    debug_menu(test_mod          = True,       random_path    = False,
+    debug_menu(test_mod          = True,       random_path    = False,      no_sampling = False,
                debug_run_path    = False,      debug_path     = False,
                check_search_map  = False,      debug_map      = False,
                start             = True,       game_loop      = True)
+    
     config_game_map()
     if 'random_path' in debug : return debug_random_path()
     if 'check_search_map' in debug : return check_search_map()
@@ -49,6 +50,8 @@ def start() :
         print(*start_tile, sep = ' ')  
     elif 'debug_path' in debug or 'debug_map' in debug :
         print(f'my_start_tile : {start_tile}')
+    else : 
+        print(f'my_start_tile : {start_tile}')
         his_play_map = next_tile(his_play_map)
         print(f"his_start tile : {his_play_map['position']}")
     return my_play_map, his_play_map
@@ -62,11 +65,11 @@ def game_loop(my_play_map, his_play_map) :
         print(lap)
         my_play_map, his_play_map, sonar_result, his_order = game_input(my_play_map, his_play_map)
         his_play_map = manage_order(his_order, sonar_result, my_play_map, his_play_map)
-        #my_play_map = play(my_play_map, his_play_map)     
+        my_play_map = play(my_play_map, his_play_map)     
         lap += 1
 
 " GAME LOOP MANAGER "
-
+"""
 def game_input(my_play_map, his_play_map) :
     game_keys = ['x','y',              'my_life',
                  'his_life',           'torpedo_cooldown',
@@ -89,11 +92,45 @@ def game_input(my_play_map, his_play_map) :
                      'my_life'     : 6,
                      'his_life'    : 6})
         sonar_result = 'NA'
+        
         his_play_map = next_tile(his_play_map)
         next_direction = random.choice(his_play_map['next_directions'])
         his_order = f"MOVE {dir_converter(*next_direction)} TORPEDO"
         his_play_map['position'] = add_tuple(his_play_map['position'], next_direction[0])
     return my_play_map, his_play_map, sonar_result, his_order
+"""
+def game_input(my_play_map, his_play_map) :
+
+    if not debug :
+        x, y, my_life, opp_life, torpedo_cooldown, sonar_cooldown, silence_cooldown, mine_cooldown = [int(i) for i in input().split()]
+        sonar_result = input()
+        his_order = input()
+    else :
+        x,y = my_play_map['position']
+        my_life = random.randint(1,6) if not my_play_map['life'] else my_play_map['life']
+        opp_life = random.randint(1,6) if not his_play_map['life'] else his_play_map['life']
+        torpedo_cooldown = random.randint(1,3) if not my_play_map['torpedo_cooldown'] else my_play_map['torpedo_cooldown']
+        sonar_cooldown = random.randint(1,4) if not my_play_map['sonar_cooldown'] else my_play_map['sonar_cooldown']
+        silence_cooldown = random.randint(1,6) if not my_play_map['silence_cooldown'] else my_play_map['silence_cooldown']
+        mine_cooldown = random.randint(1,6) if not my_play_map['mine_cooldown'] else my_play_map['mine_cooldown'] # how_many ???
+        sonar_result = 'NA'
+        
+        his_play_map = next_tile(his_play_map)
+        next_direction = random.choice(his_play_map['next_directions'])
+        his_order = f"MOVE {dir_converter(*next_direction)} TORPEDO"
+        his_play_map['position'] = add_tuple(his_play_map['position'], next_direction[0])
+    
+    his_play_map['life'] = opp_life
+    my_play_map.update({'position'         : (x,y),
+                        'life'             : my_life,
+                        'torpedo_cooldown' : torpedo_cooldown,
+                        'sonar_cooldown'   : sonar_cooldown,
+                        'silence_cooldown' : silence_cooldown,
+                        'mine_cooldown'    : mine_cooldown
+                        })
+    
+    return my_play_map, his_play_map, sonar_result, his_order
+
 
 def manage_order(his_order, sonar_result, my_play_map, his_play_map) :
     ### direction must be append at the beginning in dir path
@@ -117,7 +154,8 @@ def manage_order(his_order, sonar_result, my_play_map, his_play_map) :
     return update_play_map(his_play_map, my_play_map)
 
 def play(my_play_map, his_play_map) :
-    # calculer play_map['target']
+    
+    
     
         # evaluer torpedo decision
         
@@ -132,15 +170,35 @@ def play(my_play_map, his_play_map) :
     # evaluer silence
     
     # evaluer surface 
-
-    next_direction = random.choice(my_play_map['next_direction'])
+    
+    next_direction = random.choice(my_play_map['next_directions'])
+    print(f"play next_dir : {next_direction}, position {my_play_map['position']}")
     my_play_map['position'] = add_tuple(my_play_map['position'], next_direction[0])
+    print(f"play next_dir : {next_direction}, position {my_play_map['position']}")
     reversed_direction = reverse_direction(next_direction)
     my_play_map['direction_path'].insert(0,reversed_direction)
-    play_map = update_play_map(my_play_map, his_play_map)
-    return  my_play_map, his_play_map
+    my_play_map = update_play_map(my_play_map, his_play_map)
+    return  my_play_map
 
 " ORDER"
+
+def config_heat_map(opp_play_map) : 
+    if len(opp_play_map['search_area']) > constant['open_heat_map'] : return {key : 0 for key in opp_play_map['search_map']}
+    sm_mean = stat.mean(opp_play_map['search_map'].values())
+    opp_heat_map = opp_play_map['search_map']
+    for repetition in range(14) :
+        for key in opp_heat_map :
+            cursor_list = list(map(lambda xy : add_tuple(key,xy),[(-1,0),(0,-1),(0,1),(1,0)]))
+            for cursor in cursor_list :
+                try : opp_heat_map[cursor] += opp_heat_map[key] / 14
+                except : opp_heat_map[key] += sm_mean / 14
+            opp_heat_map[key] += opp_play_map['search_map'][key] / 14
+    return opp_heat_map 
+
+def config_target(play_map, opp_play_map) :
+    life_ratio =    play_map['life']       / (opp_play_map['life'] + play_map['life'] )
+    scatter_ratio = play_map['scatter']    / (opp_play_map['scatter'] + play_map['scatter'])
+    return round((0.5 * life_ratio + scatter_ratio) / 1.5 , 2)
 
 def torpedo_area(center) :
     ref_position = center
@@ -168,19 +226,6 @@ def torpedo_area(center) :
             range_ = 0
         if try_ == max_try or len(torpedo_area) == 40 : return torpedo_area
 
-def config_heat_map(opp_play_map) : 
-    if len(opp_play_map['search_area']) > constant['open_heat_map'] : return {key : 0 for key in opp_play_map['search_map']}
-    sm_mean = stat.mean(opp_play_map['search_map'].values())
-    opp_heat_map = opp_play_map['search_map']
-    for repetition in range(14) :
-        for key in opp_heat_map :
-            cursor_list = list(map(lambda xy : add_tuple(key,xy),[(-1,0),(0,-1),(0,1),(1,0)]))
-            for cursor in cursor_list :
-                try : opp_heat_map[cursor] += opp_heat_map[key] / 14
-                except : opp_heat_map[key] += sm_mean / 14
-            opp_heat_map[key] += opp_play_map['search_map'][key] / 14
-    return opp_heat_map 
-
 " PLAY MAP"
 
 def init_play_map(who,status) :
@@ -200,7 +245,7 @@ def init_play_map(who,status) :
             
                 'search_map'                : dict(),
                 'search_area'               : game_map['sea'],
-                'positive_rate'             : float(),
+                'scatter'             : float(),
             
                 'life'                      : int(),
                 'keys_list'                 : list()}
@@ -238,7 +283,7 @@ def config_temp_play_map(next_direction_path, next_direction, direction_path = [
                         
                         'search_map'                    : dict(),
                         'search_area'                   : game_map['sea'],
-                        'positive_rate'                 : int(),
+                        'scatter'                 : int(),
                         'value'                         : int(),
                         
                         'keys_list'                     : list()}
@@ -255,9 +300,11 @@ def update_play_map(play_map, opp_play_map) :
     play_map['direction_path_length'] = len(play_map['direction_path'])
     play_map['direction_path_extending'] = extending(play_map['direction_path'])
     play_map['fork'] = [idx for idx in range(len(play_map['direction_path'])) if len(play_map['direction_path'][idx]) != 1]
-    play_map = config_search_map(play_map)
-    play_map['opp_heat_map'] = config_heat_map(opp_play_map)
     if not play_map['search_area'] : play_map['search_area'] = game_map['sea']
+    play_map = config_search_map(play_map)
+    play_map['target'] = config_target(play_map, opp_play_map)
+    play_map['opp_heat_map'] = config_heat_map(opp_play_map)
+
     if play_map['position'] not in play_map['last_tiles'] : play_map['last_tiles'].append(play_map['position'])
     return play_map
 
@@ -266,7 +313,7 @@ def update_play_map(play_map, opp_play_map) :
 def next_tile(play_map) :
     try_, test_value, min_value = 0, -1, -1
     metrics, test = {}, {}
-    keys_list = ['value', 'search_map', 'search_area', 'positive_rate', 'next_direction_path', 'next_direction']
+    keys_list = ['value', 'search_map', 'search_area', 'scatter', 'next_direction_path', 'next_direction']
     best = {key : [] for key in keys_list}
     best['max_length'] = 0
     max_time = constant['start_time'] if play_map['status'] == 'start' else constant['turn_time']
@@ -384,8 +431,12 @@ def scatter(play_map) :
     return 0.30*spread_value + 0.30*sector_value + 0.15*length_value + 0.25*scatter_value
 
 def hunting(temp_play_map, play_map) :
-    if not play_map['opp_heat_map'] : return 0
-
+    if not play_map['opp_heat_map'] or not temp_play_map['next_direction_path'] : return 0
+    hunting_value = []
+    tile_path = list(map(lambda xy : add_tuple(play_map['position'], xy),temp_play_map['next_direction_path']))
+    for tile in tile_path :
+        hunting_value.append(play_map['opp_heat_map'][tile])
+    return stat.mean(hunting_value)
 
 def debug_input(start_time, test_value, try_, play_map, temp_play_map, metrics, test) :
     if play_map['status'] == 'debug_random_path' or 'debug_map' in debug or 'debug_path' in debug :
@@ -398,7 +449,7 @@ def debug_input(start_time, test_value, try_, play_map, temp_play_map, metrics, 
                        'swing_turn' :  try_ }
             test = {'direction_path' : temp_play_map['direction_path'], 
                     'search_map' : temp_play_map['search_map'], 
-                    'positive_rate' : temp_play_map['positive_rate']}
+                    'scatter' : temp_play_map['scatter']}
     return test_value, metrics, test
 
 " SEARCH MAP"
@@ -410,7 +461,7 @@ def config_search_map(play_map) :
     sample, temp_search_area = [], []
 
     while True :
-        if play_map['status'] != 'start' or len(play_map['search_area']) < sampling_floor :
+        if play_map['status'] != 'start' or len(play_map['search_area']) < sampling_floor or 'no_sampling' in debug:
             non_tested, sample = train_test_split(play_map['search_area'], test_size=constant['sampling'])
         else : sample = play_map['search_area']
         for tile in sample :
@@ -422,11 +473,11 @@ def config_search_map(play_map) :
                 positiv_result += result
                 tested_tile += 1
                 if result : temp_search_area.append(tile)
-        positive_rate =  round(positiv_result / tested_tile, 2)
-        if  positive_rate > 1 - poll_rate or not non_tested :
-            for tile in non_tested : play_map['search_map'][tile] = positive_rate
+        probability =  round(positiv_result / tested_tile, 2)
+        if  probability > 1 - poll_rate or not non_tested :
+            for tile in non_tested : play_map['search_map'][tile] = probability
             play_map['search_area'] = [*temp_search_area, *non_tested]
-            play_map['positive_rate'] = positive_rate
+            play_map['scatter'] = 1 - probability
             return play_map
         else : 
             play_map['search_area'] = non_tested
@@ -556,6 +607,8 @@ def config_global_var():
     sampling_floor = 1/4 * (15*15)
 
 def add_tuple (tuple_1, tuple_2) :
+    if type(tuple_1) is list and len(tuple_1) == 1 : tuple_1 = tuple_1[0]
+    if type(tuple_2) is list and len(tuple_2) == 1 : tuple_2 = tuple_2[0] 
     return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
 
 def normal_law(x,s2,mu): # nouveau
@@ -635,7 +688,7 @@ def stop(fork_map) :
 
 " DEBUG"
 
-def debug_menu(test_mod           = False,    random_path     = False,
+def debug_menu(test_mod           = False,    random_path     = False, no_sampling = False,
                debug_run_path     = False,    debug_path      = False,
                check_search_map   = False,    debug_map       = False,
                start              = False,    game_loop       = False):
@@ -649,6 +702,7 @@ def debug_menu(test_mod           = False,    random_path     = False,
     if debug_path       : key.append('debug_path')
     if start            : key.append('start')
     if game_loop        : key.append('game_loop')
+    if no_sampling      : key.append('no_sampling')
     
     debug = key if test_mod else []
 
@@ -680,7 +734,7 @@ def debug_map(test_play_map) :
             except KeyError : line.append('XX')
         print(*line, sep=' ') 
     sample_size = len([i for i in test_play_map['search_map'].values() if i == 0 or i == 1])
-    print(f"positive rate : {test_play_map['positive_rate']} sample_size : {sample_size}")
+    print(f"positive rate : {test_play_map['scatter']} sample_size : {sample_size}")
     return
 
 def debug_path(test_play_map) :
