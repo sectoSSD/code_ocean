@@ -126,30 +126,45 @@ def he_play(his_order, sonar_result, my_play_map, his_play_map) :
     return update_play_map(his_play_map, my_play_map)
 
 def i_play(my_play_map, his_play_map) :
+    order = ''    
     
-    # bouger
-    
+    # Move in torpedo decision trouver Move next tile
     my_play_map = next_tile(my_play_map)
     next_direction = my_play_map['next_direction']
     my_play_map['position'] = add_tuple(my_play_map['position'], next_direction)
-    print(f"i_play() next_dir : {next_direction}, position {my_play_map['position']}")
     reversed_direction = reverse_direction(next_direction)
     my_play_map['direction_path'].insert(0,reversed_direction)
+    order += f'MOVE {dir_converter(*next_direction)} '
     
+    # charger le power nevessaire
+    if len(my_play_map['search_area']) > 36 : silence_power = False
+    if len(his_play_map['search_area']) > 36 : torpedo_power = False
+    if silence_power and my_play_map['silence_cooldown'] < 6 : power_decision = 'SILENCE'
+    elif torpedo_power and my_play_map['torpedo_cooldown'] < 3 : power_decision = 'TORPEDO'
+    elif my_play_map['sonar_cooldown'] < 4 : power_decision = 'SONAR'
+    elif my_play_map['silence_cooldown'] < 6 : power_decision = 'SILENCE'
+    elif my_play_map['torpedo_cooldown'] < 3 : power_decision = 'TORPEDO'
+    else : power_decision = 'MINE'
+    order += f"{power_decision}"
     # evaluer torpedo decision
-        
-    # si not Move in torpedo decision trouver Move next tile
-    
-    # dans les deux cas charger le power nevessaire
-    
+    if len(his_play_map['search_area']) > 9 :
+        torpedo_target = [tile for tile in his_play_map['search_area'] if tile in torpedo_area(my_play_map['position'], his_play_map) ]
+        if torpedo_target :
+            ttx, tty = random.choice(torpedo_target)
+            if type(ttx) is not int or type(tty) is not int : raise Exception("i_play()/torpedo_target : not int")
+            order += f" | TORPEDO {ttx} {ttx}"
     # evaluer trigger mine decision
-    
     # evaluer sonar decision
-    
+    sonar_decision = sonar(my_play_map, his_play_map)
+    if sonar_decision : order += f" | SONAR {sonar_decision}"
     # evaluer silence
-    
     # evaluer surface 
-    
+    surface_decision = surface(my_play_map)
+    if surface_decision : order += " | SURFACE"
+    # produire l'ordre
+    if debug : print(f"my order : '{order}'")
+    else : print(order)
+    # mettre à jour my_play_map
     my_play_map = update_play_map(my_play_map, his_play_map)
     return  my_play_map
 
@@ -177,7 +192,7 @@ def config_target(play_map, opp_play_map) :
     scatter_ratio = play_map['scatter']    / (opp_play_map['scatter'] + play_map['scatter'])
     return round((0.5 * life_ratio + scatter_ratio) / 1.5 , 2)
 
-def torpedo_area(center) :
+def torpedo_area(center, his_play_map) :
     ref_position = center
     current_position = ref_position
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
@@ -187,9 +202,10 @@ def torpedo_area(center) :
     while True :
         try_ += 1
         range_ += 1
+        if try_ == max_try or len(torpedo_area) == 40 : return torpedo_area
         current_direction = random.choice(direction)
-        current_position = add_tuple(current_position,current_direction[0])
-        if blocking(current_position) :
+        current_position = add_tuple(current_position,current_direction)
+        if blocking(current_position, his_play_map) :
             current_position = ref_position
             range_ = 0
             continue
@@ -201,7 +217,30 @@ def torpedo_area(center) :
         if range_ == torpedo_range : 
             current_position = ref_position
             range_ = 0
-        if try_ == max_try or len(torpedo_area) == 40 : return torpedo_area
+
+def sonar(my_play_map, his_play_map) :
+    sonar_decision = False
+    if my_play_map['sonar_cooldown'] == 4 :
+        sector_map = {i : int() for i in range(10)}
+        search_sector = 0
+        for tile in his_play_map['search_area'] :
+            sector = tile_sector_converter(tile)
+            sector_map[sector] += 1
+        for sector in sector_map :
+            if sector_map[sector] > search_sector : 
+                search_sector = sector_map[sector]
+        sonar_decision = search_sector
+    return sonar_decision
+
+def surface(my_play_map) :
+    cardinal_points = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
+    neighbor_tiles = list(map(lambda xy : add_tuple(xy, my_play_map['position']), cardinal_points))
+    surface = True
+    for tile in neighbor_tiles :
+        if (tile not in game_map['island']
+        or not off_side_tile(tile)
+        or tile not in my_play_map['last_tiles']) : surface = False
+    return surface
 
 " PLAY MAP"
 
@@ -386,7 +425,7 @@ def scatter(temp_play_map) :
     spread_list = []
     sector_list = []
     for key in temp_play_map['search_map'] :
-        sector_list.append(sector(key))
+        sector_list.append(tile_sector_converter(key))
         if temp_play_map['search_map'][key] == 1 :
             cursor_list = [add_tuple(key, tiles) for tiles in neighbor_tiles]
             count = 0
@@ -634,7 +673,7 @@ def off_side_tile (tile) :
     x,y = tile
     return (x not in range(0,size) or y not in range(0,size))
 
-def sector (xy) :
+def tile_sector_converter(xy) :
     sector = {'1': [ 0, 5, 0, 5], '2' : [ 0, 5, 5,10], '3' : [ 0, 5,10,15],
               '4': [ 5,10, 0, 5], '5' : [ 5,10, 5,10], '6' : [ 5,10,10,15],
               '7': [10,15, 0, 5], '8' : [10,15, 5,10], '9' : [10,15,10,15]}
@@ -668,7 +707,7 @@ def blocking(tile, play_map, index = None) :
                     if tile in game_map['island'] 
                     or off_side_tile(tile) 
                     or ( play_map['sector_in'].get(index) 
-                            and play_map['sector_in'].get(index) != sector(tile) )
+                            and play_map['sector_in'].get(index) != tile_sector_converter(tile) )
                     or ( play_map['sector_out'].get(index)
                          and tile not in play_map['sector_out'].get(index) )
                     else False)
