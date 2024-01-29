@@ -10,22 +10,24 @@ def main():
     if 'debug_random_path' in debug : return debug_random_path()
     if 'test_random_path'  in debug : return test_random_path()
     if 'check_search_map'  in debug : return check_search_map()
-    start_time = perf_counter()
+    g_time = perf_counter()
     if not debug or 'start' in debug :     
                                                 my_play_map, his_play_map = start()
     if not debug or 'game_loop' in debug :     #####################################
                                                 game_loop(my_play_map, his_play_map)
     if debug : 
-        print(f'time : {round(perf_counter() - start_time,2)}')
+        print(f'time : {round(perf_counter() - g_time,2)}')
 
 def config_constant() :
     global constant
     constant = {
         'size_map'         : 15,          # default size of when we are in test mod
-        'start_time'       : 0.7,         # how much time we can run next_tiles() at start
-        'start_time_limit' : 0.99,        # how_much time can run at start
-        'turn_time'        : 0.4,         # how much time we can run next_tiles() in game_loop
-        'turn_time_limit'  : 0.49,        # how_much time can run a loop
+        #'start_time'       : 0.70,         # how much time we can run next_tiles() at start
+        #'start_time_limit' : 0.99,        # how_much time can run at start
+        'start_time'       : 0.40,         # how much time we can run next_tiles() at start
+        'start_time_limit' : 0.45,        # how_much time can run at start
+        'turn_time'        : 0.40,         # how much time we can run next_tiles() in game_loop
+        'turn_time_limit'  : 0.45,        # how_much time can run a loop
         'max_length'       : 24,          # max length of play_map['direction_path'] in next_tiles()
         'num_test'         : 30 ,         # number of tests in debug_map_process
         'max_laps'         : 15,          # duration of the game_loop
@@ -36,6 +38,7 @@ def config_constant() :
 " STEP OF THE GAME "
 
 def start() :
+    time()
     my_play_map = init_play_map(me = True, start = True)
     his_play_map = init_play_map(me = False, start = True)
     my_play_map = next_tile(my_play_map)
@@ -43,6 +46,7 @@ def start() :
     if not debug : print(*start_tile, sep = ' ')  
     elif 'debug_path' in debug or 'debug_map' in debug : print(f'my_start_tile : {start_tile}')
     else : 
+        time()
         print(f'my_start_tile : {start_tile}')
         his_play_map = next_tile(his_play_map)
         print(f"his_start tile : {his_play_map['position']}")
@@ -55,12 +59,20 @@ def game_loop(my_play_map, his_play_map) :
     his_play_map['start'] = False
     loop = True
     while loop == True:
-        time_lap = perf_counter()
+        time()
         if debug : print(f" lap : {lap}")
+        
         my_play_map, his_play_map, sonar_result, his_order = game_input(my_play_map, his_play_map)
         his_play_map = he_play(his_order, sonar_result, my_play_map, his_play_map)
+        
+        if debug : 
+            test_time(my_play_map)
+            time()
+            
         my_play_map = i_play(my_play_map, his_play_map)     
         lap += 1
+        
+        test_time(my_play_map)
         if debug : loop = lap < constant['max_laps'] 
 
 " GAME LOOP MANAGER "
@@ -82,10 +94,13 @@ def game_input(my_play_map, his_play_map) :
         
         his_play_map = next_tile(his_play_map)
         next_direction = his_play_map['next_direction']
-        his_order = f"MOVE {dir_converter(*next_direction)} TORPEDO"
+        if next_direction and his_play_map['position'] :
+            his_order = f"MOVE {dir_converter(*next_direction)} TORPEDO"
+            his_play_map['position'] = add_tuple(his_play_map['position'], next_direction)
+        else : 
+            his_order = "SURFACE"
         if debug : print(f" his order : {his_order}")
-        his_play_map['position'] = add_tuple(his_play_map['position'], next_direction)
-    
+        
     his_play_map['life'] = opp_life
     my_play_map.update({'position'         : (x,y),
                         'life'             : my_life,
@@ -106,9 +121,9 @@ def he_play(his_order, sonar_result, my_play_map, his_play_map) :
         if order_cursor[0] == 'SILENCE' : 
             his_play_map['direction_path'].append(dir_converter('silence'))
         if order_cursor[0] == 'SURFACE' : 
-            his_play_map = init_play_map('he', 'game_loop')
-            his_play_map['sector_in'][lap] = int(order_cursor[1])
-        if (order_cursor[0] == 'SURFACE' or order_cursor[0] == 'SONAR') : 
+            his_play_map = init_play_map(me=False, start=False)
+            if not debug : his_play_map['sector_in'][lap] = int(order_cursor[1])
+        if order_cursor[0] == 'SONAR' : 
             his_play_map['sector_in'][lap] = order_cursor[1]
         if order_cursor[0] == 'TORPEDO' :
             shoot_tile = order_cursor[1], order_cursor[2]
@@ -172,7 +187,7 @@ def power_counter(power_decision, torpedo_target, mine_decision, sonar_decision,
     if power_decision == 'SILENCE' and my_play_map['silence_cooldown'] < 6 : my_play_map['silence_cooldown'] += 1
     elif power_decision == 'TORPEDO' and my_play_map['torpedo_cooldown'] < 3 : my_play_map['torpedo_cooldown'] += 1
     elif  power_decision == 'SONAR' and my_play_map['sonar_cooldown'] < 4 : my_play_map['sonar_cooldown'] += 1
-    elif power_decision == 'MINE' and my_play_map['mine_cooldown'] < 3 : my_play_map['mine_cooldown'] += 1
+    #elif power_decision == 'MINE' and my_play_map['mine_cooldown'] < 3 : my_play_map['mine_cooldown'] += 1
     if torpedo_target : my_play_map['torpedo_cooldown'] = 0
     if sonar_decision : my_play_map['sonar_cooldown'] = 0
     if mine_decision : my_play_map['mine_cooldown'] = 0
@@ -203,7 +218,8 @@ def config_heat_map(opp_play_map) :
 
 def config_target(play_map, opp_play_map) :
     life_ratio =    play_map['life']       / (opp_play_map['life'] + play_map['life'] )
-    scatter_ratio = play_map['scatter']    / (opp_play_map['scatter'] + play_map['scatter'])
+    try : scatter_ratio = play_map['scatter']    / (opp_play_map['scatter'] + play_map['scatter'])
+    except ZeroDivisionError : scatter_ratio = 0
     return round((0.5 * life_ratio + scatter_ratio) / 1.5 , 2)
 
 def torpedo_area(center, his_play_map) :
@@ -334,9 +350,6 @@ def update_play_map(play_map, opp_play_map) :
     if type(play_map['me']) is not bool    : raise Exception(f"{play_map['me']} is not valid")
     if type(play_map['main'])  is not bool : raise Exception(f"{play_map['main']} is not valid")
     if type(play_map['start']) is not bool : raise Exception(f"{play_map['start']} is not valid")
-    if debug : 
-        if off_side_tile(play_map['position'] ) : raise Exception('out !')
-        if play_map['position'] in game_map['island'] : raise Exception('island')
     
     # updating :
     if play_map['direction_path'] : 
@@ -357,22 +370,21 @@ def update_play_map(play_map, opp_play_map) :
 def next_tile(play_map) :
     try_, test_value, value = 0, -1, -1
     metrics, test = {}, {}
-    max_time = constant['start_time'] if play_map['start'] == True else constant['turn_time']
-    start_time  = perf_counter()
     open_1 = True
     while open_1 == True :
-        open_2 = perf_counter() - start_time < max_time
+        open_2 = test_time(play_map)
         while open_2 == True :
             
             temp_play_map = random_path(play_map) ###
             
             length_ratio = temp_play_map['next_direction_path_length'] / constant['max_length']
-            time_ratio = max_time / (perf_counter() - start_time + 1)
-            open_2 = length_ratio < time_ratio and perf_counter() - start_time < max_time
+            max_time = constant['start_time'] if play_map['start'] == True else constant['turn_time']
+            time_ratio = max_time / (perf_counter() - i_time + 1)
+            open_2 = length_ratio < time_ratio and test_time(temp_play_map)
         
         temp_play_map = evaluate_dir_map(play_map, temp_play_map)
         
-        test_value, metrics, test = debug_input(start_time, try_, test_value, temp_play_map, metrics, test)
+        test_value, metrics, test = debug_input(try_, test_value, temp_play_map, metrics, test)
         
         if temp_play_map['next_direction_path_length'] > play_map['max_length_direction_path'] : 
             play_map['max_length_direction_path'] = temp_play_map['next_direction_path_length'] 
@@ -383,7 +395,7 @@ def next_tile(play_map) :
             play_map['next_direction']      = temp_play_map['next_direction']
             ref_search_area                 = temp_play_map['search_area']
         try_ += 1
-        open_1 = perf_counter() - start_time < max_time
+        open_1 = test_time(temp_play_map)
     
     if 'debug_random_path' in debug : return metrics
     if 'debug_map' in debug and play_map['me'] : debug_map(test)
@@ -396,11 +408,16 @@ def next_tile(play_map) :
 def random_path(play_map) :
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
     start = play_map['start']
+    """
     if (play_map['start'] == False and (play_map['me'] or debug)) or 'test_random_path' in debug :
         start_tile = play_map['position']
     else : start_tile = random.choice(play_map['search_area'])
+    """
+    try : start_tile = play_map['position'] if play_map['position'] else random.choice(play_map['search_area'])
+    except KeyError : random.choice(play_map['search_area'])
     
-    while True :
+    open_1 = True
+    while open_1 == True :
         current_direction_path = []
         temp_direction = [(0,0)]
         first_direction = None
@@ -411,7 +428,8 @@ def random_path(play_map) :
         if play_map['me'] and play_map['last_tiles'] : current_tile_path = copy.deepcopy(play_map['last_tiles']) 
         else : current_tile_path = dir_tile_converter(play_map['direction_path'], start_tile)
         
-        while True :
+        open_2 = True
+        while open_2 == True :
             temp_direction = random.choice(direction)
             temp_tile = add_tuple(current_tile, temp_direction)
             if temp_tile not in current_tile_path and blocking(temp_tile, play_map) == False :
@@ -420,14 +438,16 @@ def random_path(play_map) :
                 current_tile = temp_tile
                 current_tile_path.append(current_tile)
                 counter = 0
-                if len(current_direction_path) == constant['max_length'] :
-                    return config_temp_play_map(start_tile, current_direction_path, first_direction, past_direction_path, start)
+                if len(current_direction_path) == constant['max_length'] : open_2, open_1 = False, False
             else :
+                if not test_time(play_map, main = False) : open_2, open_1 = False, False
                 counter += 1
                 if counter > 6 :
-                    if first_direction != None :
-                        return config_temp_play_map(start_tile, current_direction_path, first_direction, past_direction_path, start)
-                    else : break
+                    if first_direction != None : open_2, open_1 = False, False
+                    else : open_2 = False
+    
+    return config_temp_play_map(start_tile, current_direction_path, first_direction, past_direction_path, start)
+
 
 def evaluate_dir_map(play_map, temp_play_map) :
 
@@ -468,14 +488,14 @@ def hunting(temp_play_map, play_map) :
         except KeyError: break # ????
     return stat.mean(hunting_value)
 
-def debug_input(start_time, test_value, try_, temp_play_map, metrics, test) :
+def debug_input(test_value, try_, temp_play_map, metrics, test) :
     if 'debug_random_path' in debug or 'debug_map' in debug or 'debug_path' in debug :
         if temp_play_map['value'] > test_value :
 
             test_value = temp_play_map['value']
-            time = perf_counter() - start_time
+            time_ = perf_counter() - i_time
             metrics = {'direction_path' : temp_play_map['direction_path'], 'path_value' : temp_play_map['value'], 
-                       'process_time' : time, 'path_length' :temp_play_map['direction_path_length'],
+                       'process_time' : time_, 'path_length' :temp_play_map['direction_path_length'],
                        'swing_turn' :  try_ }
             test = {'direction_path' : temp_play_map['direction_path'], 
                     'search_map' : temp_play_map['search_map'], 
@@ -488,7 +508,6 @@ def config_search_map(play_map) :
     positiv_result, tested_tile = 0, 0
     poll_rate = constant['sampling']
     temp_search_area = []
-
     while True :
         
         non_tested, sample = sampling(play_map)
@@ -503,7 +522,7 @@ def config_search_map(play_map) :
                 tested_tile += 1
                 if result : temp_search_area.append(tile)
         probability =  round(positiv_result / tested_tile, 2)
-        if  probability > 1 - poll_rate or not non_tested :
+        if probability > 1 - poll_rate or not non_tested or not test_time(play_map) :
             for tile in non_tested : play_map['search_map'][tile] = probability
             play_map['search_area'] = [*temp_search_area, *non_tested]
             play_map['scatter'] = 1 - probability
@@ -511,7 +530,6 @@ def config_search_map(play_map) :
         else :
             play_map['search_area'] = non_tested
             poll_rate += constant['sampling']
-        if not test_time(play_map) : raise('time out ! : search_map')
 
 def run_path(tile, play_map) :
     fork_map = copy.deepcopy(config_fork_map(play_map))
@@ -655,15 +673,31 @@ def config_game_map() :
 " TOOLS"
 
 def config_global_var():
-    global neighbor_tiles, sampling_floor
+    global g_time, neighbor_tiles, sampling_floor
+    g_time = perf_counter()
+    i_time = 0
     neighbor_tiles = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)]
     sampling_floor = 1/4 * (15*15)
 
-def test_time(play_map) :
-    if play_map['start'] :
-        return perf_counter() - time_lap > constant['start_time_limit'] 
-    else :
-        return perf_counter() - time_lap > constant['turn_time_limit']
+def time():
+    global i_time 
+    i_time = perf_counter()
+
+def test_time(play_map, main = None, start = None) :
+    if main == None : main = play_map['main'] 
+    if start == None : play_map['start'] 
+    
+    if main and start :
+        test = perf_counter() - i_time < constant['start_time_limit'] 
+        if not test : raise Exception(f'time_out : {perf_counter() - i_time}')
+    elif main and not start:
+        test = perf_counter() - i_time < constant['turn_time_limit']
+        if not test : raise Exception(f'time_out : {perf_counter() - i_time}')
+    elif not main and start :
+        test = perf_counter() - i_time < constant['start_time'] 
+    elif not main and not start :
+        test = perf_counter() - i_time < constant['turn_time']
+    return test
 
 def add_tuple(tuple_1, tuple_2) :
     if type(tuple_1) is list and len(tuple_1) == 1 : tuple_1 = tuple_1[0]
@@ -695,7 +729,7 @@ def off_side_max(tile, direction_path_extending) :
 
 def off_side_tile (tile) :
     size = game_map['size']
-    if len(tile) != 2 : raise Exception('not tuple in off_side_tile()')
+    if len(tile) != 2 : raise Exception(f'not tuple in off_side_tile() {tile}')
     x,y = tile
     return (x not in range(0,size) or y not in range(0,size))
 
