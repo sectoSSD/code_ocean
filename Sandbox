@@ -1,8 +1,8 @@
-def main() :
+def main():
     config_constant()
     config_global_var()
     debug_menu(test_mod          = True,       no_sampling    = False,   test_random_path  = False,
-               debug_run_path    = False,      debug_path     = False,   debug_random_path = False,     
+               debug_run_path    = False,      debug_path     = False,   debug_random_path = True,     
                check_search_map  = False,      debug_map      = False, 
                start             = True,       game_loop      = True)
 
@@ -22,14 +22,14 @@ def config_constant() :
     global constant
     constant = {
         'size_map'         : 15,          # default size of when we are in test mod
-        'start_time'       : 0.70,         # how much time we can run next_tiles() at start
+        'start_time'       : 0.65,         # how much time we can run next_tiles() at start
         'start_time_limit' : 0.99,        # how_much time can run at start
-        'turn_time'        : 0.0450,         # how much time we can run next_tiles() in game_loop
-        'turn_time_limit'  : 0.0499,        # how_much time can run a loop
-        'max_length'       : 16,          # max length of play_map['direction_path'] in next_tiles()
+        'turn_time'        : 0.025,         # how much time we can run next_tiles() in game_loop
+        'turn_time_limit'  : 0.05,        # how_much time can run a loop
+        'max_length'       : 10,          # max length of play_map['direction_path'] in next_tiles()
         'num_test'         : 60,         # number of tests in debug_map_process
-        'max_laps'         : 15,          # duration of the game_loop
-        'sampling'         : 1/4,         # 
+        'max_laps'         : 20,          # duration of the game_loop
+        'sampling'         : 0.1,         # 
         'open_heat_map'    : 100
         }
 
@@ -65,15 +65,13 @@ def game_loop(my_play_map, his_play_map) :
         
         if debug : 
             test_time(my_play_map)
-            print(perf_counter() - i_time)
             time()
             
         my_play_map = i_play(my_play_map, his_play_map)   
         
         lap += 1
         test_time(my_play_map)
-        if debug : 
-            print(perf_counter() - i_time)
+        if debug :
             loop = lap < constant['max_laps'] 
 
 " GAME LOOP MANAGER "
@@ -133,11 +131,11 @@ def he_play(his_order, sonar_result, my_play_map, his_play_map) :
         if 'NA' not in sonar_result : 
             if   sonar_result[1] == 'Y' : his_play_map['sector_in'][lap - 1] = sonar_result[0]
             elif sonar_result[1] == 'N' : his_play_map['sector_out'][lap - 1] = sonar_result[0]
-    if debug : print(f"he_play() position : {his_play_map['position']} next_direction in his_order")
+    if debug : print(f"he_play() position : {his_play_map['position']}")
     return update_play_map(his_play_map, my_play_map)
 
 def i_play(my_play_map, his_play_map) :
-    order = ''    
+    order = ''
     
     # Move in torpedo decision trouver Move next tile
     my_play_map = next_tile(my_play_map)
@@ -215,7 +213,8 @@ def config_heat_map(opp_play_map) :
                 try : opp_heat_map[cursor] += opp_heat_map[key] * coef
                 except : opp_heat_map[key] += sm_mean * coef
             opp_heat_map[key] += opp_play_map['search_map'][key] * coef
-            if repetition == num_repetition - 1 : opp_heat_map[key] = round(opp_heat_map[key], 2)
+            if repetition == num_repetition - 1 or not test_time(opp_play_map): 
+                opp_heat_map[key] = round(opp_heat_map[key], 2)
     return opp_heat_map 
 
 def config_target(play_map, opp_play_map) :
@@ -362,7 +361,6 @@ def update_play_map(play_map, opp_play_map) :
         play_map = config_search_map(play_map)
         play_map['target'] = config_target(play_map, opp_play_map)
         play_map['opp_heat_map'] = config_heat_map(opp_play_map)
-    
     if play_map['me'] :
         if play_map['position'] not in play_map['last_tiles'] : play_map['last_tiles'].append(play_map['position'])
     return play_map
@@ -374,7 +372,7 @@ def next_tile(play_map) :
     metrics, test = {}, {}
     open_1 = True
     while open_1 == True :
-        open_2 = test_time(play_map)
+        open_2 = test_time(play_map, main = False)
         while open_2 == True :
             temp_play_map = random_path(play_map)
             
@@ -382,20 +380,24 @@ def next_tile(play_map) :
             max_time = constant['start_time'] if play_map['start'] == True else constant['turn_time']
             time_ratio = (perf_counter() - i_time) / max_time
             open_2 = length_ratio < time_ratio and test_time(temp_play_map)
-        temp_play_map = evaluate_dir_map(play_map, temp_play_map)
         
-        test_value, metrics, test = debug_input(test_value, try_, temp_play_map, metrics, test)
-        
-        if temp_play_map['next_direction_path_length'] > play_map['max_length_direction_path'] : 
-            play_map['max_length_direction_path'] = temp_play_map['next_direction_path_length'] 
-
-        if temp_play_map['value'] > value :
-            value = temp_play_map['value']
-            play_map['next_direction_path'] = temp_play_map['next_direction_path']
-            play_map['next_direction']      = temp_play_map['next_direction']
-            ref_search_area                 = temp_play_map['search_area']
-        try_ += 1
-        open_1 = test_time(temp_play_map)
+        try :
+            temp_play_map = evaluate_dir_map(play_map, temp_play_map)
+            
+            test_value, metrics, test = debug_input(test_value, try_, temp_play_map, metrics, test)
+            
+            if temp_play_map['next_direction_path_length'] > play_map['max_length_direction_path'] : 
+                play_map['max_length_direction_path'] = temp_play_map['next_direction_path_length'] 
+    
+            if temp_play_map['value'] > value :
+                value = temp_play_map['value']
+                play_map['next_direction_path'] = temp_play_map['next_direction_path']
+                play_map['next_direction']      = temp_play_map['next_direction']
+                ref_search_area                 = temp_play_map['search_area']
+            try_ += 1
+            open_1 = test_time(temp_play_map)
+    
+        except : break
     
     if 'debug_random_path' in debug : return metrics
     if 'debug_map' in debug and play_map['me'] : debug_map(test)
@@ -521,8 +523,8 @@ def config_search_map(play_map) :
                 positiv_result += result
                 tested_tile += 1
                 if result : temp_search_area.append(tile)
-        probability =  round(positiv_result / tested_tile, 2)
-        if probability > 1 - poll_rate or not non_tested or not test_time(play_map) :
+        probability = round(positiv_result / tested_tile, 2)
+        if probability > 1 - poll_rate or not non_tested :
             for tile in non_tested : play_map['search_map'][tile] = probability
             play_map['search_area'] = [*temp_search_area, *non_tested]
             play_map['scatter'] = 1 - probability
