@@ -4,7 +4,7 @@ def main():
     debug_menu(test_mod          = True,       no_sampling    = False,   check_random_path = False,
                debug_run_path    = False,      debug_path     = False,   test_random_path  = False,     
                check_search_map  = False,      debug_map      = False,   test_heat_map     = True,
-               start             = True,       game_loop      = True)
+               start             = True,       game_loop      = True ,   show_island       = False)
 
     config_game_map()
     if 'check_search_map'  in debug : return check_search_map()
@@ -31,7 +31,7 @@ def config_constant() :
         'num_test'         : 60,         # number of tests in debug_map_process
         'max_laps'         : 20,          # duration of the game_loop
         'sampling'         : 0.1,         # 
-        'open_heat_map'    : 100,
+        'open_heat_map'    : 250,
         'rep_heat_map'     : 14
         }
 
@@ -671,7 +671,7 @@ def config_game_map() :
             num_island = random.choices([i for i in range(40)], weights)
             island = random.sample(tiles, *num_island)
         sea = [xy for xy in tiles if xy not in island]
-    if debug : print(f"island : {island}")
+    if 'show_island' in debug : print(f"island : {island}")
     game_map = {'island' : island, 'size' : size,'sea' : sea, 'my_id' : bool(my_id)}
 
 " TOOLS"
@@ -787,9 +787,9 @@ def stop(fork_map) :
 "DEBUG" 
 
 def debug_menu(test_mod           = False,    no_sampling     = False,   check_random_path = False,
-               debug_run_path     = False,    debug_path      = False,   test_random_path = False,
-               check_search_map   = False,    debug_map       = False,   test_heat_map = False,
-               start              = False,    game_loop       = False):
+               debug_run_path     = False,    debug_path      = False,   test_random_path  = False,
+               check_search_map   = False,    debug_map       = False,   test_heat_map     = False,
+               start              = False,    game_loop       = False,   show_island       = False):
     global debug
     key = []
     if test_mod          : key.append('test_mod')
@@ -803,6 +803,7 @@ def debug_menu(test_mod           = False,    no_sampling     = False,   check_r
     if check_random_path : key.append('check_random_path')
     if test_random_path  : key.append('test_random_path')
     if test_heat_map     : key.append('test_heat_map')
+    if show_island       : key.append('show_island')
     debug = key if test_mod else []
 
 def check_search_map() :
@@ -927,7 +928,6 @@ def check_random_path() :
         print(line)
 
 def test_random_path() :
-    import matplotlib.pyplot as plt
     test_play_map = init_play_map(me = True, start = False)
     count = 0
     indicator = ['path_value', 'process_time', 'total_time', 'path_length', 'swing_turn', 
@@ -962,8 +962,8 @@ def test_random_path() :
     plt.show()
 
 def test_heat_map() :
-    test = []
-    count = []
+    pos_rat, test_rat, time_test, count = [], [], [], []
+    print("time : blue", "tested_rate : red (optional)", "positive_rate : green (optional)",  sep="\n")
     
     for positive in range(10) :
         positive_odds = positive / 10
@@ -985,40 +985,40 @@ def test_heat_map() :
                     else : opp_play_map['search_map'][tile] = 0
                 else : non_tested.append(tile)
             
-            try : positive_rate = round( positive_result / tested)
+            try : positive_rate = round( positive_result / tested, 1)
             except : positive_rate = 0
             for tile in non_tested : opp_play_map['search_map'][tile] = positive_rate
             opp_play_map['search_area'] = [*tested_and_positive, *non_tested]
             
-            start_time = perf_counter()
-            print(len(opp_play_map['search_area']))
             time()
             config_heat_map(opp_play_map)
-            print(perf_counter() - start_time)
+            time_test.append( (perf_counter() - i_time)*100)
+            count.append(int( str(positive) + str(sample)))
+            pos_rat.append(positive_rate)
+            test_rat.append(tested / 225)
 
-"""            
-def config_heat_map(opp_play_map) : 
-    if len(opp_play_map['search_area']) > constant['open_heat_map'] : return {key : 0 for key in opp_play_map['search_map']}
-    neighbor = [(-1,0),(0,-1),(0,1),(1,0)]
-    sm_mean = stat.fmean(opp_play_map['search_map'].values())
-    opp_heat_map = copy.deepcopy(opp_play_map['search_map'])
-    coef = 1 / ( constant['rep_heat_map'] * len(neighbor))
-    for repetition in range(constant['rep_heat_map']) :
-        for key in game_map['sea'] :
-            cursor_list = list(map(lambda xy : add_tuple(key,xy),neighbor))
-            for cursor in cursor_list :
-                try : opp_heat_map[cursor] += opp_heat_map[key] * coef
-                except : opp_heat_map[key] += sm_mean * coef
-            opp_heat_map[key] += opp_play_map['search_map'][key] * coef
-            if repetition == constant['rep_heat_map'] - 1 or not test_time(opp_play_map): 
-                opp_heat_map[key] = round(opp_heat_map[key], 2)
-    return opp_heat_map 
-"""
+    """ 
+    fig, ax1 = plt.subplots(layout='constrained')
+    ax1.plot(count, time_test, color = 'blue')
+    plt.show()
+    fig, ax1 = plt.subplots(layout='constrained')
+    ax1.plot(count, pos_rat, color = 'green')
+    ax1.plot(count, test_rat, color = 'red')
+    plt.show()
+    """
+    
+    fig, ax1 = plt.subplots(layout='constrained')
+    ax1.plot(count, time_test, color = 'blue')
+    ax1.plot(count, pos_rat, color = 'green')
+    ax1.plot(count, test_rat, color = 'red')
+    plt.show()
+    
 " LIBRARY "
 
 from sklearn.model_selection import train_test_split
 from time import perf_counter
 import statistics as stat
+import matplotlib.pyplot as plt
 import random
 import math
 import copy
