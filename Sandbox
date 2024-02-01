@@ -1,11 +1,11 @@
 def main():
     config_constant()
     config_global_var()
-    debug_menu(test_mod          = True,   start             = True,  game_loop        = True ,
+    debug_menu(test_mod          = True ,   start            = True ,  game_loop       = True ,
                check_search_map  = False,  test_heat_map     = False, debug_path       = False, no_sampling = False, 
                check_random_path = False,  test_random_path  = False, debug_map        = False, show_island = False,
                                                                       debug_run_path   = False                       )
-
+    
     config_game_map()
     if 'check_search_map'  in debug : return check_search_map()
     if 'check_random_path' in debug : return check_random_path()
@@ -24,14 +24,15 @@ def config_constant() :
         'size_map'         : 15,          # default size of when we are in test mod
         'start_time'       : 0.65,         # how much time we can run next_tiles() at start
         'start_time_limit' : 0.99,        # how_much time can run at start
-        'turn_time'        : 0.025,         # how much time we can run next_tiles() in game_loop
+        'turn_time'        : 0.030,         # how much time we can run next_tiles() in game_loop
         'turn_time_limit'  : 0.05,        # how_much time can run a loop
         'max_length'       : 10,          # max length of play_map['direction_path'] in next_tiles()
         'num_test'         : 60,         # number of tests in debug_map_process
         'max_laps'         : 20,          # duration of the game_loop
         'sampling'         : 0.1,         # 
         'open_heat_map'    : 250,
-        'rep_heat_map'     : 10
+        'rep_heat_map'     : 14,
+        'max_time_hm'      : 0.005
         }
 
 " STEP OF THE GAME "
@@ -83,7 +84,7 @@ def game_input(my_play_map, his_play_map) :
         x, y, my_life, opp_life, torpedo_cooldown, sonar_cooldown, silence_cooldown, mine_cooldown = [int(i) for i in input().split()]
         sonar_result = input()
         his_order = input()
-    else :
+    else : 
         x,y = my_play_map['position']
         my_life = random.randint(1,6) if not my_play_map['life'] else my_play_map['life']
         opp_life = random.randint(1,6) if not his_play_map['life'] else his_play_map['life']
@@ -121,7 +122,7 @@ def he_play(his_order, sonar_result, my_play_map, his_play_map) :
             his_play_map['direction_path'].append( dir_converter(order_cursor[1]) )
         if order_cursor[0] == 'SILENCE' : 
             his_play_map['direction_path'].append(dir_converter('silence'))
-        if order_cursor[0] == 'SURFACE' : 
+        if order_cursor[0] == 'SURFACE' :
             his_play_map = init_play_map(me=False, start=False)
             if not debug : his_play_map['sector_in'][lap] = int(order_cursor[1])
         if order_cursor[0] == 'SONAR' : 
@@ -216,7 +217,7 @@ def config_heat_map(opp_play_map) :
                 try : opp_heat_map[cursor] += opp_heat_map[key] * coef
                 except : opp_heat_map[key] += sm_mean * coef
             opp_heat_map[key] += opp_play_map['search_map'][key] * coef
-            if repetition == constant['rep_heat_map'] - 1 : 
+            if repetition == constant['rep_heat_map'] - 1 or perf_counter() - i_time > constant['max_time_hm'] : 
                 opp_heat_map[key] = round(opp_heat_map[key], 2)
     return opp_heat_map 
 
@@ -781,7 +782,7 @@ def stop(fork_map) :
 
 "DEBUG" 
 
-def debug_menu(test_mod          = True,   start             = True,  game_loop        = True ,
+def debug_menu(test_mod          = False,   start            = False, game_loop        = False,
                check_search_map  = False,  test_heat_map     = False, debug_path       = False, no_sampling = False, 
                check_random_path = False,  test_random_path  = False, debug_map        = False, show_island = False,
                                                                       debug_run_path   = False                       ) :
@@ -944,6 +945,7 @@ def test_random_path() :
         count += 1
     for key in metric : print(f'{label[key]:7s} : ({round(stat.mean(metric[key]), 2):.2f}, {round(stat.pstdev(metric[key]), 2):.2f}), ({color[key]})')
     
+    import matplotlib.pyplot as plt
     turn = list(range(constant['num_test']))
     fig, ax1 = plt.subplots(layout='constrained')
     ax1.plot(turn, metric['path_value'], color='tab:red')
@@ -992,6 +994,7 @@ def test_heat_map() :
             pos_rat.append(positive_rate)
             test_rat.append(tested / 225)
     
+    import matplotlib.pyplot as plt
     fig, ax1 = plt.subplots(layout='constrained')
     ax1.plot(count, time_test, color = 'blue')
     ax2 = ax1.twinx()
@@ -1006,7 +1009,6 @@ def test_heat_map() :
 from sklearn.model_selection import train_test_split
 from time import perf_counter
 import statistics as stat
-import matplotlib.pyplot as plt
 import random
 import math
 import copy
