@@ -1,17 +1,16 @@
 def main():
     config_constant()
     config_global_var()
-    debug_menu(test_mod          = True,       no_sampling    = False,   check_random_path = False,
-               debug_run_path    = False,      debug_path     = False,   test_random_path  = False,     
-               check_search_map  = False,      debug_map      = False,   test_heat_map     = True,
-               start             = True,       game_loop      = True ,   show_island       = False)
+    debug_menu(test_mod          = True,   start             = True,  game_loop        = True ,
+               check_search_map  = False,  test_heat_map     = False, debug_path       = False, no_sampling = False, 
+               check_random_path = False,  test_random_path  = False, debug_map        = False, show_island = False,
+                                                                      debug_run_path   = False                       )
 
     config_game_map()
     if 'check_search_map'  in debug : return check_search_map()
     if 'check_random_path' in debug : return check_random_path()
     if 'test_random_path'  in debug : return test_random_path()
     if 'test_heat_map'     in debug : return test_heat_map() 
-    g_time = perf_counter()
     if not debug or 'start' in debug :     
                                                 my_play_map, his_play_map = start()
     if not debug or 'game_loop' in debug :     #####################################
@@ -32,12 +31,13 @@ def config_constant() :
         'max_laps'         : 20,          # duration of the game_loop
         'sampling'         : 0.1,         # 
         'open_heat_map'    : 250,
-        'rep_heat_map'     : 14
+        'rep_heat_map'     : 10
         }
 
 " STEP OF THE GAME "
 
 def start() :
+    global start_tile
     time()
     my_play_map = init_play_map(me = True, start = True)
     his_play_map = init_play_map(me = False, start = True)
@@ -137,6 +137,7 @@ def he_play(his_order, sonar_result, my_play_map, his_play_map) :
     return update_play_map(his_play_map, my_play_map)
 
 def i_play(my_play_map, his_play_map) :
+    global order
     order = ''
     
     # Move in torpedo decision trouver Move next tile
@@ -215,7 +216,7 @@ def config_heat_map(opp_play_map) :
                 try : opp_heat_map[cursor] += opp_heat_map[key] * coef
                 except : opp_heat_map[key] += sm_mean * coef
             opp_heat_map[key] += opp_play_map['search_map'][key] * coef
-            if repetition == constant['rep_heat_map'] - 1 or not test_time(opp_play_map): 
+            if repetition == constant['rep_heat_map'] - 1 : 
                 opp_heat_map[key] = round(opp_heat_map[key], 2)
     return opp_heat_map 
 
@@ -414,10 +415,10 @@ def random_path(play_map) :
     start = play_map['start']
     """
     if (play_map['start'] == False and (play_map['me'] or debug)) or 'check_random_path' in debug :
-        start_tile = play_map['position']
-    else : start_tile = random.choice(play_map['search_area'])
+        onset_tile = play_map['position']
+    else : onset_tile = random.choice(play_map['search_area'])
     """
-    try : start_tile = play_map['position'] if play_map['position'] else random.choice(play_map['search_area'])
+    try : onset_tile = play_map['position'] if play_map['position'] else random.choice(play_map['search_area'])
     except KeyError : random.choice(play_map['search_area'])
     
     open_1 = True
@@ -426,11 +427,11 @@ def random_path(play_map) :
         temp_direction = [(0,0)]
         first_direction = None
         counter = 0
-        current_tile = start_tile
+        current_tile = onset_tile
         past_direction_path = play_map['direction_path']
         
         if play_map['me'] and play_map['last_tiles'] : current_tile_path = copy.deepcopy(play_map['last_tiles']) 
-        else : current_tile_path = dir_tile_converter(play_map['direction_path'], start_tile)
+        else : current_tile_path = dir_tile_converter(play_map['direction_path'], onset_tile)
         
         open_2 = True
         while open_2 == True :
@@ -450,7 +451,7 @@ def random_path(play_map) :
                     if first_direction != None : open_2, open_1 = False, False
                     else : open_2 = False
     
-    return config_temp_play_map(start_tile, current_direction_path, first_direction, past_direction_path, start)
+    return config_temp_play_map(onset_tile, current_direction_path, first_direction, past_direction_path, start)
 
 
 def evaluate_dir_map(play_map, temp_play_map) :
@@ -640,12 +641,6 @@ def update_fork_map(fork, fork_map):
 def config_game_map() :
     global game_map
     island, sea = [], []
-    """
-    Représente the playground. It's a dictionnary containning three keys  :
-    island : list of island tiles
-    size : one integer which is the length of the sides of the square
-    sea : free tiles where the submarine can move
-    """
     if not debug :
         width, height, my_id = [int(i) for i in input().split()]
         size = width if width == height else Exception('width != height')
@@ -744,9 +739,9 @@ def tile_sector_converter(xy) :
         if sector[i][0] <= xy[0] < sector[i][1] and sector[i][2] <= xy[1] < sector[i][3] : 
             return int(i)
 
-def dir_tile_converter(direction_path, start_tile=(0,0)) :
-    tile_path = [start_tile]
-    current_tile = start_tile
+def dir_tile_converter(direction_path, onset_tile=(0,0)) :
+    tile_path = [onset_tile]
+    current_tile = onset_tile
     for current_direction in direction_path :
         current_tile = add_tuple(current_tile, current_direction[0])
         tile_path.append(current_tile)
@@ -786,24 +781,24 @@ def stop(fork_map) :
 
 "DEBUG" 
 
-def debug_menu(test_mod           = False,    no_sampling     = False,   check_random_path = False,
-               debug_run_path     = False,    debug_path      = False,   test_random_path  = False,
-               check_search_map   = False,    debug_map       = False,   test_heat_map     = False,
-               start              = False,    game_loop       = False,   show_island       = False):
+def debug_menu(test_mod          = True,   start             = True,  game_loop        = True ,
+               check_search_map  = False,  test_heat_map     = False, debug_path       = False, no_sampling = False, 
+               check_random_path = False,  test_random_path  = False, debug_map        = False, show_island = False,
+                                                                      debug_run_path   = False                       ) :
     global debug
     key = []
     if test_mod          : key.append('test_mod')
-    if no_sampling       : key.append('no_sampling')
-    if debug_run_path    : key.append('debug_run_path') 
-    if check_search_map  : key.append('check_search_map')
-    if debug_map         : key.append('debug_map') 
-    if debug_path        : key.append('debug_path')
     if start             : key.append('start')
     if game_loop         : key.append('game_loop')
+    if check_search_map  : key.append('check_search_map')
     if check_random_path : key.append('check_random_path')
     if test_random_path  : key.append('test_random_path')
     if test_heat_map     : key.append('test_heat_map')
+    if debug_map         : key.append('debug_map') 
+    if debug_path        : key.append('debug_path')
+    if debug_run_path    : key.append('debug_run_path') 
     if show_island       : key.append('show_island')
+    if no_sampling       : key.append('no_sampling')
     debug = key if test_mod else []
 
 def check_search_map() :
@@ -992,26 +987,19 @@ def test_heat_map() :
             
             time()
             config_heat_map(opp_play_map)
-            time_test.append( (perf_counter() - i_time)*100)
+            time_test.append( (perf_counter() - i_time))
             count.append(int( str(positive) + str(sample)))
             pos_rat.append(positive_rate)
             test_rat.append(tested / 225)
-
-    """ 
-    fig, ax1 = plt.subplots(layout='constrained')
-    ax1.plot(count, time_test, color = 'blue')
-    plt.show()
-    fig, ax1 = plt.subplots(layout='constrained')
-    ax1.plot(count, pos_rat, color = 'green')
-    ax1.plot(count, test_rat, color = 'red')
-    plt.show()
-    """
     
     fig, ax1 = plt.subplots(layout='constrained')
     ax1.plot(count, time_test, color = 'blue')
-    ax1.plot(count, pos_rat, color = 'green')
-    ax1.plot(count, test_rat, color = 'red')
+    ax2 = ax1.twinx()
+    ax2.plot(count, pos_rat, color = 'green')
+    ax2.plot(count, test_rat, color = 'red')
     plt.show()
+    
+    print(f"mean time : {round(stat.mean(time_test), 4)}, max time : {round(max(time_test), 4)}")
     
 " LIBRARY "
 
