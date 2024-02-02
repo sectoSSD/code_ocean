@@ -205,7 +205,7 @@ def config_heat_map(opp_play_map) :
     coef = 1 / ( constant['rep_heat_map'] * 4)
     for repetition in range(constant['rep_heat_map']) :
         for key in game_map['sea'] :
-            cursor_list = list(map(lambda xy : add_tuple(key,xy),tools['manhattan']))
+            cursor_list = update_path(key, tools['manhattan'])
             for cursor in cursor_list :
                 try : opp_heat_map[cursor] += opp_heat_map[key] * coef
                 except : opp_heat_map[key] += sm_mean * coef
@@ -265,7 +265,7 @@ def sonar(my_play_map, his_play_map) :
 
 def surface(my_play_map) :
     # memo_3
-    neighbor_tiles = list(map(lambda xy : add_tuple(xy, my_play_map['position']), tools['manhattan']))
+    neighbor_tiles = update_path(my_play_map['position'], tools['manhattan'])
     surface = True
     for tile in neighbor_tiles :
         if (tile not in game_map['island']
@@ -426,7 +426,7 @@ def random_path(play_map) :
         past_direction_path = play_map['direction_path']
         
         if play_map['me'] and play_map['last_tiles'] : current_tile_path = copy.deepcopy(play_map['last_tiles']) 
-        else : current_tile_path = dir_tile_converter(play_map['direction_path'], onset_tile)
+        else : current_tile_path = update_path(onset_tile, play_map['direction_path'])
         
         open_2 = True
         while open_2 == True :
@@ -482,7 +482,8 @@ def hunting(temp_play_map, play_map) :
     if play_map['me'] and (not play_map['opp_heat_map'] or not temp_play_map['next_direction_path']) : return 0
     if not play_map['me'] and debug and (not play_map['opp_heat_map'] or not temp_play_map['next_direction_path']) : return 0
     hunting_value = []
-    tile_path = list(map(lambda xy : add_tuple(temp_play_map['position'], xy), temp_play_map['next_direction_path']))
+    tile_path = update_path(temp_play_map['position'], temp_play_map['next_direction_path'])
+    
     # revenir
     for tile in tile_path :
         try : hunting_value.append(play_map['opp_heat_map'][tile])
@@ -727,14 +728,8 @@ def tile_sector_converter(xy) :
         if sector[i][0] <= xy[0] < sector[i][1] and sector[i][2] <= xy[1] < sector[i][3] : 
             return int(i)
 
-def dir_tile_converter(direction_path, onset_tile=(0,0)) :
-    tile_path = [onset_tile]
-    current_tile = onset_tile
-    for current_direction in direction_path :
-        current_tile = add_tuple(current_tile, current_direction[0])
-        tile_path.append(current_tile)
-    # memo 6
-    return tile_path
+def update_path(tile=(0,0), path = []) :    
+    return [tile, *list(map(lambda xy : add_tuple(tile, xy), path))]
 
 def dir_converter(key) :
     # NB : can't put list of tuple as key
@@ -872,7 +867,7 @@ def debug_path(test_play_map) :
     min_x = min([xy[0] for xy in path_cursor])
     min_y = min([xy[1] for xy in path_cursor])
     correction = -min_x, -min_y
-    path_cursor = list(map(lambda xy : add_tuple(xy, correction),path_cursor))
+    path_cursor = update_path(correction, path_cursor)
     path_cursor = { key : value for value,key in enumerate(path_cursor) }
     max_x = max([xy[0] for xy in path_cursor])
     max_y = max([xy[1] for xy in path_cursor])
@@ -932,7 +927,7 @@ def check_random_path() :
         if len(test_play_map['next_direction_path']) == 10 : break 
     print(test_play_map['next_direction_path'])
     test_play_map['position'] = (1,1)
-    test_tile_path = dir_tile_converter(test_play_map['next_direction_path'], test_play_map['position'])
+    test_tile_path = update_path(test_play_map['position'], test_play_map['next_direction_path'])
     
     for x in range(game_map['size']) :
         line = []
