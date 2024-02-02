@@ -16,7 +16,7 @@ def main():
     if not debug or 'game_loop' in debug :     #####################################
                                                 game_loop(my_play_map, his_play_map)
     if debug : 
-        print(f'time : {round(perf_counter() - g_time,2)}')
+        print(f"time : {round(perf_counter() - tools['g_time'],2)}")
 
 def config_constant() :
     global constant
@@ -27,9 +27,10 @@ def config_constant() :
         'turn_time'        : 0.025,         # how much time we can run next_tiles() in game_loop
         'turn_time_limit'  : 0.05,        # how_much time can run a loop
         'max_length'       : 10,          # max length of play_map['direction_path'] in next_tiles()
-        'num_test'         : 60,         # number of tests in debug_map_process
+        'num_test'         : 60,          # number of tests in debug_map_process
         'max_laps'         : 20,          # duration of the game_loop
-        'sampling'         : 0.1,         # 
+        'sampling'         : 0.1,         #
+        'samp_floor'       : 0.25*(15*15),
         'open_heat_map'    : 250,
         'rep_heat_map'     : 14,
         'max_time_hm'      : 0.0055
@@ -127,8 +128,7 @@ def he_play(his_order, sonar_result, my_play_map, his_play_map) :
 
 def i_play(my_play_map, his_play_map) :
     global order
-    order = ''
-    
+    order = '' 
     # Move in torpedo decision trouver Move next tile
     my_play_map = next_tile(my_play_map)
     next_direction = my_play_map['next_direction']
@@ -136,19 +136,10 @@ def i_play(my_play_map, his_play_map) :
     reversed_direction = reverse_direction(next_direction)
     my_play_map['direction_path'].insert(0,reversed_direction)
     order += f'MOVE {dir_converter(*next_direction)} '
-    
     # charger le power nevessaire
-    silence_power = False if len(my_play_map['search_area']) > 36 else True
-    torpedo_power = False if len(his_play_map['search_area']) > 36 else True
-    if silence_power and my_play_map['silence_cooldown'] < 6 : power_decision = 'SILENCE'
-    elif torpedo_power and my_play_map['torpedo_cooldown'] < 3 : power_decision = 'TORPEDO'
-    elif my_play_map['sonar_cooldown'] < 4 : power_decision = 'SONAR'
-    elif my_play_map['silence_cooldown'] < 6 : power_decision = 'SILENCE'
-    elif my_play_map['torpedo_cooldown'] < 3 : power_decision = 'TORPEDO'
-    #else : power_decision = 'MINE'
-    else : power_decision = 'TORPEDO'
-    order += f"{power_decision}"
-
+    if power_decision(my_play_map, his_play_map) : 
+        power = power_decision(my_play_map, his_play_map)
+    order += f"{power}"
     # evaluer torpedo decision
     torpedo_target = []
     if len(his_play_map['search_area']) < 9 :
@@ -175,6 +166,20 @@ def i_play(my_play_map, his_play_map) :
     my_play_map = power_counter(power_decision, torpedo_target, mine_decision, sonar_decision, surface_decision, my_play_map)
     return  my_play_map
 
+# power
+
+def power_decision(my_play_map, his_play_map) :
+    silence_power = False if len(my_play_map['search_area']) > 36 else True
+    torpedo_power = False if len(his_play_map['search_area']) > 36 else True
+    if silence_power and my_play_map['silence_cooldown'] < 6 : power = 'SILENCE'
+    elif torpedo_power and my_play_map['torpedo_cooldown'] < 3 : power = 'TORPEDO'
+    elif my_play_map['sonar_cooldown'] < 4 : power = 'SONAR'
+    elif my_play_map['silence_cooldown'] < 6 : power = 'SILENCE'
+    elif my_play_map['torpedo_cooldown'] < 3 : power = 'TORPEDO'
+    #else : power_decision = 'MINE'
+    else : power = 'TORPEDO'
+    return power
+
 def power_counter(power_decision, torpedo_target, mine_decision, sonar_decision, surface_decision, my_play_map) :
     if power_decision == 'SILENCE' and my_play_map['silence_cooldown'] < 6 : my_play_map['silence_cooldown'] += 1
     elif power_decision == 'TORPEDO' and my_play_map['torpedo_cooldown'] < 3 : my_play_map['torpedo_cooldown'] += 1
@@ -194,13 +199,13 @@ def power_counter(power_decision, torpedo_target, mine_decision, sonar_decision,
 def config_heat_map(opp_play_map) : 
     if len(opp_play_map['search_area']) > constant['open_heat_map'] : 
         return {key : 0 for key in opp_play_map['search_map']}
-    neighbor = [(-1,0),(0,-1),(0,1),(1,0)]
+    # memo_1
     sm_mean = stat.fmean(opp_play_map['search_map'].values())
     opp_heat_map = copy.deepcopy(opp_play_map['search_map'])
-    coef = 1 / ( constant['rep_heat_map'] * len(neighbor))
+    coef = 1 / ( constant['rep_heat_map'] * 4)
     for repetition in range(constant['rep_heat_map']) :
         for key in game_map['sea'] :
-            cursor_list = list(map(lambda xy : add_tuple(key,xy),neighbor))
+            cursor_list = list(map(lambda xy : add_tuple(key,xy),tools['manhattan']))
             for cursor in cursor_list :
                 try : opp_heat_map[cursor] += opp_heat_map[key] * coef
                 except : opp_heat_map[key] += sm_mean * coef
@@ -215,13 +220,13 @@ def config_target(play_map, opp_play_map) :
     except ZeroDivisionError : scatter_ratio = 0
     return round((0.5 * life_ratio + scatter_ratio) / 1.5 , 2)
 
-def torpedo_area(center, his_play_map) :
-    ref_position = center
+def torpedo_area(ref_position, his_play_map) :
     current_position = ref_position
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
     torpedo_area = []
     torpedo_range = 4
     range_, try_, max_try = 0, 0, torpedo_range**6
+    # memo
     while True :
         try_ += 1
         range_ += 1
@@ -245,6 +250,7 @@ def sonar(my_play_map, his_play_map) :
     sonar_decision = False
     if my_play_map['sonar_cooldown'] == 4 :
         sector_map = {i : int() for i in range(10)}
+         # memo_2 ... refair
         search_sector = 0
         sonar_sector = 0
         for tile in his_play_map['search_area'] :
@@ -258,8 +264,8 @@ def sonar(my_play_map, his_play_map) :
     return sonar_decision
 
 def surface(my_play_map) :
-    cardinal_points = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
-    neighbor_tiles = list(map(lambda xy : add_tuple(xy, my_play_map['position']), cardinal_points))
+    # memo_3
+    neighbor_tiles = list(map(lambda xy : add_tuple(xy, my_play_map['position']), tools['manhattan']))
     surface = True
     for tile in neighbor_tiles :
         if (tile not in game_map['island']
@@ -283,7 +289,7 @@ def init_play_map(me, start) :
                 'sector_out'                : dict(),
                 'sector_tiles'              : dict(),
             
-                'search_map'                : {key : 1 for key in game_map['sea']},
+                'search_map'                : {key : 1 for key in game_map['sea']}, # memo_1
                 'search_area'               : game_map['sea'],
                 'scatter'                   : float(),
             
@@ -457,7 +463,7 @@ def scatter(temp_play_map) :
     for key in temp_play_map['search_map'] :
         sector_list.append(tile_sector_converter(key))
         if temp_play_map['search_map'][key] == 1 :
-            cursor_list = [add_tuple(key, tiles) for tiles in neighbor_tiles]
+            cursor_list = [add_tuple(key, tiles) for tiles in tools['euclidean']]
             count = 0
             for cursor in cursor_list :
                 try : temp_play_map['search_map'][cursor]
@@ -477,6 +483,7 @@ def hunting(temp_play_map, play_map) :
     if not play_map['me'] and debug and (not play_map['opp_heat_map'] or not temp_play_map['next_direction_path']) : return 0
     hunting_value = []
     tile_path = list(map(lambda xy : add_tuple(temp_play_map['position'], xy), temp_play_map['next_direction_path']))
+    # revenir
     for tile in tile_path :
         try : hunting_value.append(play_map['opp_heat_map'][tile])
         except KeyError: break # ????
@@ -544,7 +551,7 @@ def run_path(tile, play_map) :
 def sampling(play_map) :
         sampling = True 
         if ( play_map['start'] == True 
-        or len(play_map['search_area']) < sampling_floor 
+        or len(play_map['search_area']) < constant['samp_floor'] 
         or 'no_sampling' in debug
         or 'check_search_map in debug') : sampling = False
         if sampling == True : 
@@ -647,10 +654,14 @@ def config_game_map() :
 " TOOLS"
 
 def config_global_var():
-    global g_time, neighbor_tiles, sampling_floor
-    g_time = perf_counter()
-    neighbor_tiles = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)]
-    sampling_floor = 1/4 * (15*15)
+    global tools
+    tools = {'g_time'         : perf_counter(),
+             'manhattan'      : [[(1,0)], [(-1,0)], [(0,1)], [(0,-1)]],
+             'euclidean'      : [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)],
+             'silence_tiles'  : list(set([(x,0) for x in range(-4,5)] + [(0,y) for y in range(-4,5)])),
+             'torpedo_tiles'  : [(x,y) for x in range(-4, 5) for y in range(-4, 5) if abs(x) + abs(y) <= 4 and (x != 0 or y!= 0)]
+            }
+    return tools
 
 def time():
     global i_time 
@@ -722,6 +733,7 @@ def dir_tile_converter(direction_path, onset_tile=(0,0)) :
     for current_direction in direction_path :
         current_tile = add_tuple(current_tile, current_direction[0])
         tile_path.append(current_tile)
+    # memo 6
     return tile_path
 
 def dir_converter(key) :
@@ -731,7 +743,7 @@ def dir_converter(key) :
                 ( 1, 0) : 'E', 'E' : [( 1, 0)],
                 ( 0,-1) : 'N', 'N' : [( 0,-1)],
                 ( 0, 1) : 'S', 'S' : [( 0, 1)],
-                'silence' : list(set([(x,0) for x in range(-4,5)] + [(0,y) for y in range(-4,5)])) }
+                'silence' : tools['silence_tiles']}
     return dir_dic[key]
 
 def blocking(tile, play_map, index = None) :
@@ -798,8 +810,8 @@ def debug_menu(test_mod          = False,   start            = False, game_loop 
     debug = key if test_mod else []
 
 def check_search_map() :
-    cardinal_points = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
-    for direction in cardinal_points :
+    
+    for direction in tools['manhattan'] :
         direction_path = [direction for _ in range(constant['size_map'] - 1) ]
         test_play_map = {}
         test_play_map['me'] = True
