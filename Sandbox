@@ -22,6 +22,7 @@ def config_constant() :
     global constant
     constant = {
         'size_map'         : 15,          # default size of when we are in test mod
+        'torpedo_range'    : 4,
         'start_time'       : 0.65,         # how much time we can run next_tiles() at start
         'start_time_limit' : 0.99,        # how_much time can run at start
         'turn_time'        : 0.025,         # how much time we can run next_tiles() in game_loop
@@ -140,31 +141,16 @@ def i_play(my_play_map, his_play_map) :
     if power_decision(my_play_map, his_play_map) : 
         power = power_decision(my_play_map, his_play_map)
     order += f"{power}"
-    # evaluer torpedo decision
-    torpedo_target = []
-    if len(his_play_map['search_area']) < 9 :
-        # torpedo_target = [tile for tile in his_play_map['search_area'] if tile in torpedo_area(my_play_map['position'], his_play_map)]
-        torpedo_target = [tile for tile in his_play_map['search_area'] if tile in torpedo_area(my_play_map['position'], his_play_map)]
-        if torpedo_target :
-            ttx, tty = random.choice(torpedo_target)
-            if type(ttx) is not int or type(tty) is not int : raise Exception("i_play()/torpedo_target : not int")
-            order += f" | TORPEDO {ttx} {ttx}"
-    # evaluer trigger mine decision
-    mine_decision = False
-    # evaluer sonar decision
-    sonar_decision = sonar(my_play_map, his_play_map)
-    if sonar_decision : 
-        order += f" | SONAR {sonar_decision}"
+    order += torpedo_decision(my_play_map['position'], his_play_map)
+    order += mine_decision()
+    order += sonar_decision(my_play_map, his_play_map) 
     # evaluer silence
-    # evaluer surface 
-    surface_decision = surface(my_play_map)
-    if surface_decision : order += " | SURFACE"
-    # produire l'ordre
+    order += surface_decision(my_play_map)
     if debug : print(f"my order : '{order}'")
     else : print(order)
     # mettre à jour my_play_map
     my_play_map = update_play_map(my_play_map, his_play_map)
-    my_play_map = power_counter(power_decision, torpedo_target, mine_decision, sonar_decision, surface_decision, my_play_map)
+    # my_play_map = power_counter(power_decision, torpedo_target, mine_decision, sonar_decision, surface_decision, my_play_map)
     return  my_play_map
 
 # power
@@ -181,6 +167,7 @@ def power_decision(my_play_map, his_play_map) :
     else : power = 'TORPEDO'
     return power
 
+"""
 def power_counter(power_decision, torpedo_target, mine_decision, sonar_decision, surface_decision, my_play_map) :
     if power_decision == 'SILENCE' and my_play_map['silence_cooldown'] < 6 : my_play_map['silence_cooldown'] += 1
     elif power_decision == 'TORPEDO' and my_play_map['torpedo_cooldown'] < 3 : my_play_map['torpedo_cooldown'] += 1
@@ -194,7 +181,24 @@ def power_counter(power_decision, torpedo_target, mine_decision, sonar_decision,
         my_play_map['silence_cooldown'] = 0
         my_play_map['torpedo_cooldown'] = 0
     return my_play_map
+"""
 
+
+def torpedo_decision(my_play_map, his_play_map) :
+    if len(his_play_map['search_area']) < 9 :
+        torpedo = torpedo_area(my_play_map['position'], his_play_map)
+        torpedo_target = []
+        for tile in his_play_map['search_area'] :
+            if tile in torpedo : torpedo_target.append(tile)
+        if torpedo_target :
+            ttx, tty = random.choice(torpedo_target)
+            if type(ttx) is not int or type(tty) is not int : raise Exception("i_play()/torpedo_target : not int")
+        return f" | TORPEDO {ttx} {ttx}"
+    else : return ''
+
+def mine_decision() :
+    return ''
+     
 " ORDER"
 
 def config_heat_map(opp_play_map) : 
@@ -221,31 +225,29 @@ def config_target(play_map, opp_play_map) :
     except ZeroDivisionError : scatter_ratio = 0
     return round((0.5 * life_ratio + scatter_ratio) / 1.5 , 2)
 
-def sonar(my_play_map, his_play_map) :
+def sonar_decision(my_play_map, his_play_map) :
     sonar_decision = False
     if my_play_map['sonar_cooldown'] == 4 :
         sector_map = {i : int() for i in range(10)}
          # memo_2 ... refair
         search_sector = 0
-        sonar_sector = 0
         for tile in his_play_map['search_area'] :
             sector = tile_sector_converter(tile)
             sector_map[sector] += 1
         for sector in sector_map :
             if sector_map[sector] > search_sector : 
                 search_sector = sector_map[sector]
-                sonar_sector = sector
-        sonar_decision = sonar_sector
-    return sonar_decision
+                sonar_decision = sector
+    return f" | SONAR {sonar_decision}" if sonar_decision else ''
 
-def surface(my_play_map) :
+def surface_decision(my_play_map) :
     neighbor_tiles = update_path(my_play_map['position'], tools['manhattan'])
     surface = True
     for tile in neighbor_tiles :
         if (tile not in game_map['island']
         or not off_side_tile(tile)
         or tile not in my_play_map['last_tiles']) : surface = False
-    return surface
+    return " | SURFACE" if surface else ''
 
 " PLAY MAP"
 
@@ -406,7 +408,7 @@ def random_path(play_map) :
         while open_2 == True :
             temp_direction = random.choice(direction)
             temp_tile = add_tuple(current_tile, temp_direction)
-            if temp_tile not in current_tile_path and blocking(temp_tile, play_map) == False :
+            if temp_tile not in current_tile_path and not blocking(temp_tile, play_map) :
                 if first_direction == None : first_direction = temp_direction
                 current_direction_path.append(temp_direction)
                 current_tile = temp_tile
@@ -715,11 +717,30 @@ def dir_converter(key) :
                 'silence' : tools['silence_tiles']}
     return dir_dic[key]
 
-def torpedo_area(ref_position, his_play_map) :
-    return [tile for tile in tools['torpedo_tiles'] if blocking(tile, his_play_map) ]
+def torpedo_area(ref_position) :
+    if type(ref_position) is not tuple : raise Exception('bad settings')
+    path = [ref_position]
+    range_ = 0
+    torpedo_area = []
+    while True :
+        run = False
+        for cursor in update_path(path[-1], tools['manhattan']) :
+            if cursor in torpedo_area or blocking(cursor) or range_ == 5 : continue
+            else :
+                run = True
+                range_ += 1
+                path.append(cursor)
+                torpedo_area.append(cursor)
+                break
+        if not run :
+            if path[-1] is ref_position : 
+                torpedo_area.remove(ref_position)
+                return torpedo_area
+            range_ -= 1
+            path.pop(-1)
 
-def blocking(tile, play_map, index = None) :
-    if play_map['main'] == False :
+def blocking(tile, play_map = None, index = None) :
+    if play_map['main'] == False or not play_map :
         blocking = True if tile in game_map['island'] or off_side_tile(tile) else False
     else :
         blocking = (True 
