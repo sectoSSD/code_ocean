@@ -113,7 +113,7 @@ def he_play(his_order, sonar_result, my_play_map, his_play_map) :
         if order_cursor[0] == 'SILENCE' : 
             his_play_map['direction_path'].append(dir_converter('silence'))
         if order_cursor[0] == 'SURFACE' :
-            his_play_map = init_play_map(me=False, start=False)
+            his_play_map = init_play_map(me=False, start=False, position=his_play_map['position'])
             if not debug : his_play_map['sector_in'][lap] = int(order_cursor[1])
         if order_cursor[0] == 'SONAR' : 
             his_play_map['sector_in'][lap] = order_cursor[1]
@@ -204,7 +204,7 @@ def mine_decision() :
 def config_heat_map(opp_play_map) : 
     if len(opp_play_map['search_area']) > constant['open_heat_map'] : 
         return {key : 0 for key in opp_play_map['search_map']}
-    # memo_1
+    # memo_1 : introduire get
     sm_mean = stat.fmean(opp_play_map['search_map'].values())
     opp_heat_map = copy.deepcopy(opp_play_map['search_map'])
     coef = 1 / ( constant['rep_heat_map'] * 4)
@@ -241,17 +241,16 @@ def sonar_decision(my_play_map, his_play_map) :
     return f" | SONAR {sonar_decision}" if sonar_decision else ''
 
 def surface_decision(my_play_map) :
+    # memo
     neighbor_tiles = update_path(my_play_map['position'], tools['manhattan'])
     surface = True
     for tile in neighbor_tiles :
-        if (tile not in game_map['island']
-        or not off_side_tile(tile)
-        or tile not in my_play_map['last_tiles']) : surface = False
+        if not blocking(tile, my_play_map,  lap) : surface = False
     return " | SURFACE" if surface else ''
 
 " PLAY MAP"
 
-def init_play_map(me, start) :
+def init_play_map(me, start, position = tuple()) :
     play_map = {'me'                        : me,
                 'main'                      : True, # 'main' : his_play_map, my_play_map / temp : temp_play_map
                 'start'                     : start,
@@ -281,7 +280,7 @@ def init_play_map(me, start) :
     if me or debug :
         play_map.update({'target'                    : int(),
                          'opp_heat_map'              : dict(),
-                         'position'                  : tuple(),
+                         'position'                  : position,
                          'last_tiles'                : list(),
                 
                          'next_direction'           : list(),
@@ -377,8 +376,7 @@ def next_tile(play_map) :
     if 'debug_map' in debug and play_map['me'] : debug_map(test)
     if 'debug_path' in debug and play_map['me'] : debug_path(test)
     
-    if play_map['start'] == True : 
-        play_map['position'] = random.choice(ref_search_area)
+    if play_map['start'] : play_map['position'] = random.choice(ref_search_area)
     return play_map
 
 def random_path(play_map) :
@@ -389,8 +387,7 @@ def random_path(play_map) :
         onset_tile = play_map['position']
     else : onset_tile = random.choice(play_map['search_area'])
     """
-    try : onset_tile = play_map['position'] if play_map['position'] else random.choice(play_map['search_area'])
-    except KeyError : random.choice(play_map['search_area'])
+    onset_tile = play_map.get('position') if play_map.get('position') else random.choice(play_map['search_area'])
     
     open_1 = True
     while open_1 == True :
@@ -460,7 +457,7 @@ def hunting(temp_play_map, play_map) :
     hunting_value = []
     tile_path = update_path(temp_play_map['position'], temp_play_map['next_direction_path'])
     
-    # revenir
+    # memo
     for tile in tile_path :
         try : hunting_value.append(play_map['opp_heat_map'][tile])
         except KeyError: break # ????
@@ -506,7 +503,7 @@ def run_path(tile, play_map) :
             fork_map = update_fork_map(cursor['idx'], fork_map)
             controller['stop'] = stop(fork_map)
         "B : obstacle : " 
-        controller['blocking'] = blocking(cursor['tile'], play_map, cursor['idx'])
+        controller['blocking'] = blocking(cursor['tile'], play_map, cursor['lap'])
         "C : bout de path : " 
         controller['end_path'] = True if cursor['idx'] == play_map['direction_path_length'] - 1 else False
 
@@ -526,35 +523,28 @@ def run_path(tile, play_map) :
 # managing severals cases ...
 
 def sampling(play_map) :
-        sampling = True 
-        if ( play_map['start'] == True 
-        or len(play_map['search_area']) < constant['samp_floor'] 
-        or 'no_sampling' in debug
-        or 'check_search_map in debug') : sampling = False
-        if sampling == True : 
-            non_tested, sample = train_test_split(play_map['search_area'], test_size=constant['sampling'])
-        else : 
-            non_tested, sample = [], play_map['search_area']
-        return non_tested, sample
-
+    if (play_map['start'] or len(play_map['search_area']) < constant['samp_floor'] or 'no_sampling' in debug
+        or 'check_search_map' in debug) :
+        non_tested, sample = [], play_map['search_area'] 
+    else : non_tested, sample  = train_test_split(play_map['search_area'], test_size=constant['sampling'])
+    return non_tested, sample
+     
 # cursor
 
 def initial_cursor(play_map, fork_map, tile) :
-    # 'dir' : current position in play_map
-    # 'idx' : current index in play_map
-    # 'fork' : least embranchement '' if no fork
-    # 'tile' : current tile on map
-    init_cursor = {'dir' : (), 'idx' : 0, 'tile' : () }
-    init_cursor['dir'] = ( 
-                          play_map['direction_path'][0][fork_map['fork'][0]-1] 
-                          if fork_map['fork'].get(0)
-                          else play_map['direction_path'][0][0]
-                         )
-    init_cursor['tile'] = add_tuple(tile, init_cursor['dir'])
-    return init_cursor
+    direction = ( play_map['direction_path'][0][fork_map['fork'][0]-1] 
+                  if fork_map['fork'].get(0)
+                  else play_map['direction_path'][0][0] )
+    return {'idx' : int(),
+            'lap' : lap if play_map['main'] and play_map['me'] else None,  
+            'dir' : direction,
+            'tile' : add_tuple(tile, direction) 
+           }
+
 
 def update_cursor (cursor, play_map, fork_map) :
     cursor['idx'] += 1
+    cursor['lap'] = lap - cursor['idx'] if play_map['main'] and play_map['me'] else None
     branch_index = (fork_map['fork'][cursor['idx']] 
                     if fork_map['fork'].get(cursor['idx'])
                     else 0)
@@ -740,18 +730,17 @@ def torpedo_area(ref_position) :
             path.pop(-1)
 
 def blocking(tile, play_map = None, index = None) :
-    if play_map['main'] == False or not play_map :
-        blocking = True if tile in game_map['island'] or off_side_tile(tile) else False
-    else :
-        blocking = (True 
+    if play_map['main'] :
+        return (True 
                     if tile in game_map['island'] 
                     or off_side_tile(tile) 
                     or ( play_map['sector_in'].get(index) 
                             and play_map['sector_in'].get(index) != tile_sector_converter(tile) )
                     or ( play_map['sector_out'].get(index)
                          and tile not in play_map['sector_out'].get(index) )
+                    or ( tile in play_map.get('last_tiles') )
                     else False)
-    return blocking
+    else : return tile in game_map['island'] or off_side_tile(tile)
 
 def stop(fork_map) :
     if len(fork_map['fork']) != len(fork_map['max']) : 
@@ -809,6 +798,7 @@ def check_search_map() :
         test_play_map = {}
         test_play_map['me'] = True
         test_play_map['main'] = False
+        test_play_map['start'] = False
         test_play_map['direction_path'] = direction_path
         test_play_map['direction_path_length'] = len(direction_path)
         test_play_map['direction_path_extending'] = extending(direction_path)
