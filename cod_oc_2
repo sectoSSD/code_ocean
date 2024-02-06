@@ -86,7 +86,7 @@ def game_input(my_play_map, his_play_map) :
         keys   = ['x', 'y', 'my_life', 'opp_life', 'torpedo_cooldown', 'sonar_cooldown', 'silence_cooldown', 'mine_cooldown']
         values = [int(i) for i in input().split()]
         input_ = dict(zip(keys, values))
-        input_['position'] = tuple(input_['x'],input_['y'])
+        input_['position'] = input_['x'],input_['y']
         input_.pop('x')
         input_.pop('y')
         sonar_result = input()
@@ -730,7 +730,7 @@ def torpedo_area(ref_position) :
             path.pop(-1)
 
 def blocking(tile, play_map = None, index = None) :
-    if play_map['main'] :
+    if play_map and play_map['main'] :
         return (True 
                     if tile in game_map['island'] 
                     or off_side_tile(tile) 
