@@ -1,7 +1,7 @@
 def main():
     config_constant()
     config_global_var()
-    debug_menu(test_mod          = False,   start            = True ,  game_loop       = True ,
+    debug_menu(test_mod          = True ,   start            = True , game_loop       = True ,
                check_search_map  = False,  test_heat_map     = False, debug_path       = False, no_sampling = False, 
                check_random_path = False,  test_random_path  = False, debug_map        = False, show_island = False,
                                                                       debug_run_path   = False                       )
@@ -65,28 +65,23 @@ def game_loop(my_play_map, his_play_map) :
     lap = 0
     my_play_map['start'] = False
     his_play_map['start'] = False
-    loop = True
     while True:
-        time()
-        if debug : print(f" lap : {lap}")
+        if debug : print(f"lap : {lap}")
         
         my_play_map, his_play_map, sonar_result, his_order = game_input(my_play_map, his_play_map)
-        his_play_map = he_play(his_order, sonar_result, my_play_map, his_play_map)
         
-        if debug : 
-            test_time(my_play_map)
-            time()
-            
+        his_play_map = he_play(his_order, sonar_result, my_play_map, his_play_map)
+
         my_play_map = i_play(my_play_map, his_play_map)   
         
         lap += 1
         test_time(my_play_map)
-
         if debug and lap == C['max_laps'] : break
 
 " GAME LOOP MANAGER "
 
 def game_input(my_play_map, his_play_map) :
+    time()
     if not debug :
         keys   = ['x', 'y', 'my_life', 'opp_life', 'torpedo_cooldown', 'sonar_cooldown', 'silence_cooldown', 'mine_cooldown']
         values = [int(i) for i in input().split()]
@@ -132,7 +127,7 @@ def he_play(his_order, sonar_result, my_play_map, his_play_map) :
             if   sonar_result[1] == 'Y' : his_play_map['sector_in'][lap - 1] = sonar_result[0]
             elif sonar_result[1] == 'N' : his_play_map['sector_out'][lap - 1] = sonar_result[0]
     his_play_map = update_play_map(his_play_map, my_play_map)
-    if debug : print(f"he_play() position : {his_play_map['position']}, (t:{round(perf_counter()-i_time,3)})")
+    if debug : print(f"his order : '{his_order}' ({round(perf_counter()-i_time,3)})")
     return his_play_map
 
 def i_play(my_play_map, his_play_map) :
@@ -149,8 +144,7 @@ def i_play(my_play_map, his_play_map) :
         order += mine_decision()
         order += sonar_decision(my_play_map, his_play_map) 
         # evaluer silence
-        
-    if debug : print(f"my order : '{order}', (t:{round(perf_counter()-i_time,3)})")
+    if debug : print(f"my order  : '{order}' ({round(perf_counter()-i_time,3)})")
     else : print(order)
     my_play_map = update_play_map(my_play_map, his_play_map)
     return  my_play_map
@@ -208,7 +202,7 @@ def mine_decision() :
 def sonar_decision(my_play_map, his_play_map) :
     if my_play_map['sonar_cooldown'] > 0 : 
         return ''
-    if len(his_play_map['search_area'] > C['sonar_floor']) :
+    if len(his_play_map['search_area']) > C['sonar_floor'] :
         return f" | SONAR {random.randint(1, 9)}"
     else :
         sector_map = {i : int() for i in range(10)}
@@ -782,7 +776,6 @@ def create_input(my_play_map, his_play_map) :
         his_order = f"MOVE {dir_converter(*next_direction)} TORPEDO"
         his_play_map['position'] = add_tuple(his_play_map['position'], next_direction)
     else : his_order = "SURFACE"
-    print(f" his order : {his_order}")
     return input_, sonar_result, his_order
 
 def next_tile_recorder(test_value, try_, temp_play_map, metrics, test) :
