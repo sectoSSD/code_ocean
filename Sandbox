@@ -2,8 +2,8 @@ def main():
     g_timer()
     config_constant()
     config_global_var()
-    debug_menu(test_mod          = True ,   start            = True , game_loop       = True ,
-               check_search_map  = False,  test_heat_map     = True, debug_path       = False, no_sampling = False, 
+    debug_menu(test_mod          = True ,  start             = True , game_loop        = True ,
+               check_search_map  = False,  test_heat_map     = False, debug_path       = False, no_sampling = False, 
                check_random_path = False,  test_random_path  = False, debug_map        = False, show_island = False,
                                                                       debug_run_path   = False                       )
     
@@ -115,11 +115,7 @@ def he_play(my_play_map, his_play_map) :
         if order_cursor[0] == 'SILENCE' : 
             his_play_map['direction_path'].append(dir_converter('silence'))
         if order_cursor[0] == 'SURFACE' :
-            if debug : 
-                his_play_map = init_play_map(me=False, start=False, position=his_play_map['position'])
-            else : 
-                his_play_map = init_play_map(me=False, start=False)
-                his_play_map['sector_in'][lap] = int(order_cursor[1])
+            his_play_map = surface_play_map(his_play_map, int(order_cursor[1]))
         if order_cursor[0] == 'SONAR' : 
             his_play_map['sector_in'][lap] = order_cursor[1]
         if order_cursor[0] == 'TORPEDO' :
@@ -138,7 +134,8 @@ def i_play(my_play_map, his_play_map) :
     i_timer()
     if surface_decision(my_play_map) : 
         order = 'SURFACE'
-        my_play_map = surface_decision(my_play_map)
+        sector = tile_sector_converter(my_play_map['position'])
+        my_play_map = surface_play_map(my_play_map, sector)
     else :
         order += move_decision(my_play_map)
         order += power_decision(my_play_map, his_play_map)
@@ -158,14 +155,7 @@ def surface_decision(my_play_map) :
     surface = True
     for tile in neighbor_tiles :
         if not blocking(tile, my_play_map,  lap) : surface = False
-    if surface :
-        sector = tile_sector_converter(my_play_map['position'])
-        position = my_play_map['position']
-        my_play_map = init_play_map(me = True, start = True)
-        my_play_map['position'] = position
-        my_play_map['sector_in'].update({lap : sector})
-        return my_play_map
-    else : return surface
+    return surface
 
 def move_decision(my_play_map) :
     my_play_map = next_tile(my_play_map)
@@ -203,20 +193,13 @@ def mine_decision() :
     return ''
 
 def sonar_decision(my_play_map, his_play_map) :
-    if my_play_map['sonar_cooldown'] > 0 : my_play_map.update({'sonar' : 0})
+    if my_play_map['sonar_cooldown'] > 0 : sector = 0
     else :
         if len(his_play_map['search_area']) > C['sonar_floor'] :
-            my_play_map.update({'sonar' : random.randint(1, 9)})
+            sector = tile_sector_converter(random.choice(his_play_map['search_area']))
         else :
-            sector_map = {i : int() for i in range(10)}
-            search_sector = 0
-            for tile in his_play_map['search_area'] :
-                sector = tile_sector_converter(tile)
-                sector_map[sector] += 1
-            for sector in sector_map :
-                if sector_map[sector] > search_sector : 
-                    search_sector = sector_map[sector]
-                    my_play_map.update({'sonar' : sector})
+            sector = stat.mode(list(map(lambda tile : tile_sector_converter(tile), his_play_map['search_area'])))
+    my_play_map.update({'sonar' : sector})
     return my_play_map
 
 " ORDER"
@@ -289,11 +272,11 @@ def init_play_map(me, start, position = tuple()) :
     play_map['keys_list'] = list(play_map)
     return play_map
 
-def config_temp_play_map(position, next_direction_path, next_direction, past_direction_path, start) :
+def config_temp_play_map(play_map, position, next_direction_path, next_direction) :
     "just a format for evaluate_dir_map()"
-    direction_path = [*past_direction_path, *next_direction_path]
+    direction_path = [*play_map['direction_path'], *next_direction_path]
     temp_play_map =  {  'main'                          : False,
-                        'start'                         : start,
+                        'start'                         : play_map['start'],
                         'position'                      : position,
                         
                         'next_direction'                : next_direction,
@@ -301,14 +284,14 @@ def config_temp_play_map(position, next_direction_path, next_direction, past_dir
                         'next_direction_path_length'    : len(next_direction_path),
                         'next_direction_path_extending' : extending(next_direction_path),
                         
-                        'past_direction_path'           : past_direction_path,
+                        'past_direction_path'           : play_map['direction_path'],
                         
                         'direction_path'                : direction_path,
                         'direction_path_length'         : len(direction_path),
                         'direction_path_extending'      : extending(direction_path),
                         
                         'search_map'                    : dict(),
-                        'search_area'                   : game_map['sea'],
+                        'search_area'                   : play_map['search_area'],
                         'scatter'                       : float(),
                         'value'                         : int(),
                         
@@ -316,6 +299,15 @@ def config_temp_play_map(position, next_direction_path, next_direction, past_dir
     temp_play_map['keys_list'] = list(temp_play_map)
     return temp_play_map
 
+def surface_play_map(play_map, sector_in) :
+    play_map.update({'direction_path' : list(),
+                    'sector_in'       : {lap : sector_in},
+                    'sector_out'      : dict(),
+                    'sector_tiles'    : dict()})
+    if play_map.get('last_tiles') : 
+        play_map.update({'last_tiles' : list()})
+    return play_map
+            
 def update_play_map(play_map, opp_play_map) :
     # checking :
     for key in play_map : 
@@ -325,15 +317,13 @@ def update_play_map(play_map, opp_play_map) :
     if type(play_map['start']) is not bool  : raise Exception(f"{play_map['start']} is not valid")
     
     # updating :
-    if play_map['direction_path'] : 
-        play_map['direction_path_length'] = len(play_map['direction_path'])
-        play_map['direction_path_extending'] = extending(play_map['direction_path'])
-        play_map['fork'] = [idx for idx in range(len(play_map['direction_path'])) if len(play_map['direction_path'][idx]) != 1]
-        if not play_map['search_area'] : play_map['search_area'] = game_map['sea']
-        play_map = config_search_map(play_map)
-        if play_map['me'] or debug : 
-            play_map['target'] = config_target(play_map, opp_play_map)
-            play_map['opp_heat_map'] = config_heat_map(opp_play_map)
+    play_map['direction_path_length'] = len(play_map['direction_path'])
+    play_map['direction_path_extending'] = extending(play_map['direction_path'])
+    play_map['fork'] = [idx for idx in range(len(play_map['direction_path'])) if len(play_map['direction_path'][idx]) != 1]
+    play_map = config_search_map(play_map)
+    if play_map['me'] or debug : 
+        play_map['target'] = config_target(play_map, opp_play_map)
+        play_map['opp_heat_map'] = config_heat_map(opp_play_map)
     if play_map['me'] :
         if play_map['position'] not in play_map['last_tiles'] : play_map['last_tiles'].append(play_map['position'])
     return play_map
@@ -383,7 +373,6 @@ def next_tile(play_map) :
 
 def random_path(play_map) :
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
-    start = play_map['start']
     onset_tile = play_map.get('position') if play_map.get('position') else random.choice(play_map['search_area'])
     
     open_1 = True
@@ -393,7 +382,6 @@ def random_path(play_map) :
         first_direction = None
         counter = 0
         current_tile = onset_tile
-        past_direction_path = play_map['direction_path']
         current_tile_path = [current_tile]
         open_2 = True
         while open_2 == True :
@@ -413,7 +401,7 @@ def random_path(play_map) :
                     if first_direction != None : open_2, open_1 = False, False
                     else : open_2 = False
     
-    return config_temp_play_map(onset_tile, current_direction_path, first_direction, past_direction_path, start)
+    return config_temp_play_map(play_map, onset_tile, current_direction_path, first_direction)
 
 
 def evaluate_dir_map(play_map, temp_play_map) :
@@ -476,7 +464,8 @@ def config_search_map(play_map) :
                 positiv_result += result
                 tested_tile += 1
                 if result : temp_search_area.append(tile)
-        probability = round(positiv_result / tested_tile, 2)
+        try : probability = round(positiv_result / tested_tile, 2)
+        except ZeroDivisionError : probability = 0
         if probability > 1 - poll_rate or not non_tested :
             for tile in non_tested : play_map['search_map'][tile] = probability
             play_map['search_area'] = [*temp_search_area, *non_tested]
@@ -487,6 +476,7 @@ def config_search_map(play_map) :
             poll_rate += C['sampling']
 
 def run_path(tile, play_map) :
+    if not play_map['direction_path'] : return 1
     fork_map = copy.deepcopy(config_fork_map(play_map))
     cursor = initial_cursor(play_map, fork_map, tile)
     controller = {'blocking' : False,  'end_path' : False, 'stop' : True}
