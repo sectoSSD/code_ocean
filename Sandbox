@@ -3,7 +3,7 @@ def main():
     config_constant()
     config_global_var()
     debug_menu(test_mod          = True ,   start            = True , game_loop       = True ,
-               check_search_map  = False,  test_heat_map     = False, debug_path       = False, no_sampling = False, 
+               check_search_map  = False,  test_heat_map     = True, debug_path       = False, no_sampling = False, 
                check_random_path = False,  test_random_path  = False, debug_map        = False, show_island = False,
                                                                       debug_run_path   = False                       )
     
@@ -39,7 +39,8 @@ def config_constant() :
         'samp_floor'       : 0.25*(15*15),
         'rep_heat_map'     : 14,
         'max_time_hm'      : 0.0055,
-        'sonar_floor'      : 75
+        'sonar_floor'      : 75,
+        'torpedo_floor'    : 12
         }
 
 " STEP OF THE GAME "
@@ -187,7 +188,7 @@ def power_decision(my_play_map, his_play_map) :
 
 def torpedo_decision(my_play_map, his_play_map) :
     order = ''
-    if len(his_play_map['search_area']) < 9 and my_play_map['torpedo_cooldown'] == 0 :
+    if len(his_play_map['search_area']) < C['torpedo_floor'] and my_play_map['torpedo_cooldown'] == 0 :
         torpedo = torpedo_area(my_play_map['position'])
         torpedo_target = []
         for tile in his_play_map['search_area'] :
@@ -203,24 +204,26 @@ def mine_decision() :
 
 def sonar_decision(my_play_map, his_play_map) :
     if my_play_map['sonar_cooldown'] > 0 : my_play_map.update({'sonar' : 0})
-    if len(his_play_map['search_area']) > C['sonar_floor'] :
-        my_play_map.update({'sonar' : random.randint(1, 9)})
     else :
-        sector_map = {i : int() for i in range(10)}
-        search_sector = 0
-        for tile in his_play_map['search_area'] :
-            sector = tile_sector_converter(tile)
-            sector_map[sector] += 1
-        for sector in sector_map :
-            if sector_map[sector] > search_sector : 
-                search_sector = sector_map[sector]
-                my_play_map.update({'sonar' : sector})
+        if len(his_play_map['search_area']) > C['sonar_floor'] :
+            my_play_map.update({'sonar' : random.randint(1, 9)})
+        else :
+            sector_map = {i : int() for i in range(10)}
+            search_sector = 0
+            for tile in his_play_map['search_area'] :
+                sector = tile_sector_converter(tile)
+                sector_map[sector] += 1
+            for sector in sector_map :
+                if sector_map[sector] > search_sector : 
+                    search_sector = sector_map[sector]
+                    my_play_map.update({'sonar' : sector})
     return my_play_map
 
 " ORDER"
 
 def config_heat_map(opp_play_map) :
-    sm_mean = stat.fmean(opp_play_map['search_map'].values())
+    # sm_mean = stat.fmean(opp_play_map['search_map'].values())
+    sm_mean = 1 - opp_play_map['scatter']
     opp_heat_map = copy.deepcopy(opp_play_map['search_map'])
     coef = 1 / ( C['rep_heat_map'] * 4)
     for repetition in range(C['rep_heat_map']) :
@@ -994,7 +997,8 @@ def test_heat_map() :
             tested_odds = sample / 10
             
             tested_and_positive, non_tested = [], []
-            opp_play_map = {'main' : True, 'start' : False, 'search_map' : {}, 'search_area' : []}
+            opp_play_map = {'main' : True, 'start' : False, 'search_map' : {}, 'search_area' : [], 
+                            'scatter' : int()}
             tested = 0
             positive_result = 0
             
@@ -1010,6 +1014,7 @@ def test_heat_map() :
             
             try : positive_rate = round( positive_result / tested, 1)
             except : positive_rate = 0
+            opp_play_map['scatter'] = 1 - positive_rate
             for tile in non_tested : opp_play_map['search_map'][tile] = positive_rate
             opp_play_map['search_area'] = [*tested_and_positive, *non_tested]
             
