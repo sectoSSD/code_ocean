@@ -6,7 +6,7 @@ def main():
     message_context(show_his_search_map = True)
     
     debug_menu(test_mod          = True ,  start             = True , game_loop        = True ,
-               check_search_map  = True,  test_heat_map     = False, debug_path       = False, no_sampling = False, 
+               check_search_map  = False,  test_heat_map     = False, debug_path       = False, no_sampling = False, 
                check_random_path = False,  test_random_path  = False, debug_map        = False, show_island = False,
                                                                       debug_run_path   = False                       )
     
@@ -242,7 +242,7 @@ def init_play_map(me, start, position = tuple()) :
 
                 'direction_path'            : [ [(0,0)] ],
                 'direction_path_length'     : 1,
-                'direction_path_extending'  : tuple(),
+                'direction_path_extending'  : (0,0),
                 'fork'                      : list(),
             
                 'sector_in'                 : dict(),
@@ -594,11 +594,11 @@ def config_game_map() :
                 else : sea.append(tile)
     elif 'check_random_path' in debug :
         size = 7
-        my_id = random.choice([0,1])
+        my_id = 0
         sea = [(1,1),(1,2),(1,3),(2,3),(3,3),(3,4),(3,5),(3,6),(4,6),(5,6),(6,6),(7,6),(7,7)]
         island = [(x,y) for x in range(size) for y in range(size) if (x,y) not in sea]
     else : 
-        my_id = random.choice([0,1])
+        my_id = 0
         size = C['size_map']
         weights = [normal_law(i,s2=5,mu=20) for i in range(40)] 
         tiles = [(x,y) for x in range(size) for y in range(size)]
@@ -837,21 +837,35 @@ def next_tile_recorder(test_value, try_, temp_play_map, metrics, test) :
 # check
 
 def check_search_map() :
+    global lap
+    lap = 0
+    true_result = { 
+        'sector_in'    : {  xy   : 1 if tile_sector_converter(xy) == 2 else 0 for xy in game_map['sea']},
+        'sector_out'   : {  xy   : 0 if tile_sector_converter(xy) == 2 else 1 for xy in game_map['sea']},
+        'sector_tiles' : {  xy   : 1 if xy in torpedo_area((10,7)) else 0 for xy in game_map['sea']},
+        'E'            : { (x,y) : 0 if x != 0  or 5 < y < 9 else 1 for x,y in game_map['sea']},
+        'W'            : { (x,y) : 0 if x != 14 or 5 < y < 9 else 1 for x,y in game_map['sea']},
+        'S'            : { (x,y) : 0 if y != 0  or 5 < x < 9 else 1 for x,y in game_map['sea']},
+        'N'            : { (x,y) : 0 if y != 14 or 5 < x < 9 else 1 for x,y in game_map['sea']}}
     
-    for direction in tools['manhattan'] :
-        direction_path = [direction for _ in range(C['size_map'] - 1) ]
-        test_play_map = {}
-        test_play_map['me'] = True
-        test_play_map['main'] = False
-        test_play_map['start'] = False
-        test_play_map['direction_path'] = direction_path
-        test_play_map['direction_path_length'] = len(direction_path)
-        test_play_map['direction_path_extending'] = extending(direction_path)
-        test_play_map['search_area'] = game_map['sea']
-        test_play_map['search_map'] = dict()
+    label_list = list(true_result)
+    value_list = ['sector_in', 'sector_out', 'sector_tiles', *tools['manhattan']]
+    cursor_list = list(zip(label_list, value_list))
+    for label, value in cursor_list :
+        test_play_map = init_play_map(me = True, start = False)
+        if label in ['sector_in', 'sector_out'] : test_play_map[value] = {0 : 2}
+        elif label == 'sector_tiles' : test_play_map['sector_tiles'] = {0 : torpedo_area((10,7))}
+        else : 
+            direction_path = [value for _ in range(C['size_map'] - 1) ]
+            test_play_map['direction_path'] = direction_path
+            test_play_map['direction_path_length'] = len(direction_path)
+            test_play_map['direction_path_extending'] = extending(direction_path)
+            
         test_play_map = config_search_map(test_play_map)
-        print(f" direction check : {dir_converter(*direction)}")
-        debug_map(test_play_map)
+        test = all( true_result[label][tile] == test_play_map['search_map'][tile] 
+                   for tile in test_play_map['search_map'])
+        print(f" test {label} : {test}")
+        # debug_map(test_play_map)
         
 def check_random_path() :
     play_map = init_play_map('debug', 'debug')
