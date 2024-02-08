@@ -121,8 +121,7 @@ def he_play(my_play_map, his_play_map) :
                 next_direction = dir_converter(order_cursor[1])
                 his_play_map = add_to_direction_path(his_play_map, next_direction)
             if order_cursor[0] == 'SILENCE' : 
-                his_play_map['direction_path'].append(dir_converter('silence'))
-    
+                his_play_map['direction_path'].insert(0, dir_converter('silence'))
             if order_cursor[0] == 'SONAR' : 
                 his_play_map['sector_in'][lap] = order_cursor[1]
             if order_cursor[0] == 'TORPEDO' :
@@ -194,6 +193,7 @@ def torpedo_decision(my_play_map, his_play_map) :
             ttx, tty = random.choice(torpedo_target)
             if type(ttx) is not int or type(tty) is not int : raise Exception("i_play()/torpedo_target : not int")
             order = f" | TORPEDO {ttx} {ttx}"
+    # put play_map['sector_in'][lap] = torpedo_area(ttx, tty)
     return order
 
 def mine_decision() :
@@ -207,6 +207,7 @@ def sonar_decision(my_play_map, his_play_map) :
         else :
             sector = stat.mode(list(map(lambda tile : tile_sector_converter(tile), his_play_map['search_area'])))
     my_play_map.update({'sonar' : sector})
+    #                   'sector_in : tile_sector_converter(tile)})
     return my_play_map
 
 " ORDER"
@@ -684,7 +685,7 @@ def reverse_direction(direction) :
 def add_to_direction_path(play_map, next_direction = None) :
     if not next_direction : next_direction = play_map['next_direction']
     reversed_direction = reverse_direction(next_direction)
-    play_map['direction_path'].insert(0,reversed_direction)
+    play_map['direction_path'].insert(0, reversed_direction)
     return play_map
 
 def dir_converter(key) :
@@ -724,9 +725,9 @@ def off_side_tile (tile) :
     return (x not in range(0,size) or y not in range(0,size))
 
 def tile_sector_converter(xy) :
-    sector = {'1': [ 0, 5, 0, 5], '2' : [ 0, 5, 5,10], '3' : [ 0, 5,10,15],
-              '4': [ 5,10, 0, 5], '5' : [ 5,10, 5,10], '6' : [ 5,10,10,15],
-              '7': [10,15, 0, 5], '8' : [10,15, 5,10], '9' : [10,15,10,15]}
+    sector = {'1': [ 0, 5, 0, 5], '4' : [ 0, 5, 5,10], '7' : [ 0, 5,10,15],
+              '2': [ 5,10, 0, 5], '5' : [ 5,10, 5,10], '8' : [ 5,10,10,15],
+              '3': [10,15, 0, 5], '6' : [10,15, 5,10], '9' : [10,15,10,15]}
     for i in '123456789' :
         if sector[i][0] <= xy[0] < sector[i][1] and sector[i][2] <= xy[1] < sector[i][3] : 
             return int(i)
