@@ -1,3 +1,5 @@
+# voir interaction entre play_map['path_extending'] et add_direction path. Un truc qui cloche
+
 def main():
     g_timer()
     config_constant()
@@ -1057,7 +1059,7 @@ def test_heat_map() :
     ax2.plot(count, pos_rat, color = 'green')
     ax2.plot(count, test_rat, color = 'red')
     plt.show()
-    
+
     print(f"mean time : {round(stat.mean(time_test), 4)}, max time : {round(max(time_test), 4)}")
     
 " LIBRARY "
