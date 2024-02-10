@@ -1,14 +1,25 @@
 # voir interaction entre play_map['path_extending'] et add_direction path. Un truc qui cloche
 
-"game controller"
+"instruction"
+
+debug = True
 
 # show message :
 i_instruction = True
 i_show_his_search_map = True
 
-# automatic message :
+# test :
 i_next_tile_security = False
 
+# show
+i_show_island = True
+i_show_run_path = False # ne doit prendre qu'un tour
+show_test_s_m  = False
+
+# option :
+no_sampling = False
+start = True
+game_loop = True
 
 def main():
     g_timer()
@@ -17,20 +28,18 @@ def main():
     
     
     
-    debug_menu(test_mod          = True ,  start             = True , game_loop        = True ,
-               show_test_s_m  = False,  test_heat_map     = False, debug_path       = False, no_sampling = False, 
-               check_random_path = False,  test_random_path  = False, debug_map        = False, show_island = False,
-                                                                      debug_run_path   = False                       )
+    debug_menu(test_mod          = True ,  start             = True, test_heat_map     = False, debug_path       = False, 
+               check_random_path = False,  test_random_path  = False, debug_map        = False)
     
     if debug : check_search_map()
     config_game_map()
     if 'check_random_path' in debug : return check_random_path()
     if 'test_random_path'  in debug : return test_random_path()
     if 'test_heat_map'     in debug : return test_heat_map() 
-    if not debug or 'start' in debug :     
-                                                my_play_map, his_play_map = start()
-    if not debug or 'game_loop' in debug :     #####################################
-                                                game_loop(my_play_map, his_play_map)
+    if start :     
+                       my_play_map, his_play_map = start()
+    if game_loop :     #####################################
+                       game_loop(my_play_map, his_play_map)
     g_timer('print')
 
 def config_constant() :
@@ -533,8 +542,8 @@ def config_search_map(play_map) :
             poll_rate += C['sampling']
 
 def sampling(play_map) :
-    if (play_map['start'] or len(play_map['search_area']) < C['samp_floor'] or 'no_sampling' in debug
-        or check_search_map) :
+    if (play_map['start'] or len(play_map['search_area']) < C['samp_floor'] or no_sampling
+        or i_check_search_map) :
         non_tested, sample = [], play_map['search_area'] 
     else : non_tested, sample  = train_test_split(play_map['search_area'], test_size=C['sampling'])
     return non_tested, sample
@@ -554,7 +563,7 @@ def run_path(tile, play_map) :
         "C : bout de path : " 
         controller['end_path'] = True if cursor['idx'] == play_map['direction_path_length'] - 1 else False
 
-        if 'debug_run_path' in debug : debug_run_path(controller, cursor, fork_map, tile)
+        if i_show_run_path : show_run_path(controller, cursor, fork_map, tile)
             
         if controller['end_path'] == True and controller['blocking'] == False : search_map += 1.00
         
@@ -655,13 +664,13 @@ def config_game_map() :
         size = C['size_map']
         weights = [normal_law(i,s2=5,mu=20) for i in range(40)] 
         tiles = [(x,y) for x in range(size) for y in range(size)]
-        if check_search_map :
+        if i_check_search_map :
             island = [(x,y) for x in range(6,9) for y in range(6,9)]
         else :
             num_island = random.choices([i for i in range(40)], weights)
             island = random.sample(tiles, *num_island)
         sea = [xy for xy in tiles if xy not in island]
-    if 'show_island' in debug : print(f"island : {island}")
+    if i_show_island and not i_check_search_map : print(f"island : {island}")
     i_start = bool(my_id)
     game_map = {'island' : island, 'size' : size,'sea' : sea}
 
@@ -768,7 +777,7 @@ def off_side_max(tile, direction_path_extending) :
     e_w += tile[0]
     n_s += tile[1]
     # memo
-    if check_search_map : return False
+    if i_check_search_map : return False
     else : return (e_w not in range(0,size) or n_s not in range(0,size))
 
 def off_side_tile (tile) :
@@ -854,9 +863,9 @@ def add_message(my_play_map, his_play_map) :
 "DEBUG" 
 
 def debug_menu(test_mod          = False,   start            = False, game_loop        = False,
-               test_heat_map     = False,  debug_path       = False, no_sampling = False, show_test_s_m  = False,
-               check_random_path = False,  test_random_path  = False, debug_map        = False, show_island = False,
-                                                                      debug_run_path   = False                       ) :
+               test_heat_map     = False,  debug_path       = False, show_test_s_m  = False,
+               check_random_path = False,  test_random_path  = False, debug_map        = False,
+                                                                                           ) :
     global debug
     key = list()
     if test_mod          : key.append('test_mod')
@@ -868,9 +877,6 @@ def debug_menu(test_mod          = False,   start            = False, game_loop 
     if test_heat_map     : key.append('test_heat_map')
     if debug_map         : key.append('debug_map') 
     if debug_path        : key.append('debug_path')
-    if debug_run_path    : key.append('debug_run_path') 
-    if show_island       : key.append('show_island')
-    if no_sampling       : key.append('no_sampling')
     debug = key if test_mod else []
 
 def create_input(my_play_map, his_play_map) :
@@ -911,9 +917,9 @@ def next_tile_recorder(test_value, try_, temp_play_map, metrics, test) :
 # check
 
 def check_search_map() :
-    global lap, test_game_map
+    global lap, i_check_search_map
     lap = 0
-    test_game_map = True
+    i_check_search_map = True
     config_game_map()
     test_list = {}
     true_result = { 
@@ -941,14 +947,14 @@ def check_search_map() :
         test_play_map = config_search_map(test_play_map)
         test = all( true_result[label][tile] == test_play_map['search_map'][tile] 
                    for tile in test_play_map['search_map'])
-        if 'show_test_s_m' in debug : 
+        if show_test_s_m : 
             print(f" test {label} : {test}")
             debug_map(test_play_map)
         else : 
             test_list[label] = test
     if all(test_list.values()) : 
         print('check_search_map')
-        test_game_map = False
+        i_check_search_map = False
     else : raise Exception(f"check_search_map : {test_list}")
         
 def check_random_path() :
@@ -1024,7 +1030,7 @@ def debug_path(test_play_map) :
             print(*line, sep=' ')
     else : return spread, spread_length
 
-def debug_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
+def show_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
         """ 
         Trace what occuring un run_path() which is the function where we test each tile without island
         to know if a given direction path could start or finish in this tile. When status is start we test 
