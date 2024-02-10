@@ -10,11 +10,14 @@ i_show_his_search_map = True
 
 # test :
 i_next_tile_security = False
+i_test_heat_map     = False
 
 # show
 i_show_island = True
 i_show_run_path = False # ne doit prendre qu'un tour
-show_test_s_m  = False
+i_show_search_map = False
+i_show_test_search_map = False
+i_test_random_path  = True
 
 # option :
 no_sampling = False
@@ -25,21 +28,19 @@ def main():
     g_timer()
     config_constant()
     config_global_var()
-    
-    
-    
-    debug_menu(test_mod          = True ,  start             = True, test_heat_map     = False, debug_path       = False, 
-               check_random_path = False,  test_random_path  = False, debug_map        = False)
+
+    debug_menu(test_mod = True, debug_path  = False, 
+               check_random_path = False,  )
     
     if debug : check_search_map()
     config_game_map()
     if 'check_random_path' in debug : return check_random_path()
-    if 'test_random_path'  in debug : return test_random_path()
-    if 'test_heat_map'     in debug : return test_heat_map() 
+    if i_test_random_path : return test_random_path()
+    if i_test_heat_map : return test_heat_map() 
     if start :     
-                       my_play_map, his_play_map = start()
-    if game_loop :     #####################################
-                       game_loop(my_play_map, his_play_map)
+                                                 my_play_map, his_play_map = start()
+    if game_loop and not i_show_search_map :     #####################################
+                                                 game_loop(my_play_map, his_play_map)
     g_timer('print')
 
 def config_constant() :
@@ -76,7 +77,7 @@ def start() :
     my_play_map = next_tile(my_play_map)
     start_tile = my_play_map['position']
     if not debug : print(*start_tile, sep = ' ')  
-    elif 'debug_path' in debug or 'debug_map' in debug : print(f'my_start_tile : {start_tile}')
+    elif 'debug_path' in debug or i_show_search_map : print(f'my_start_tile : {start_tile}')
     else : 
         i_timer()
         print(f'my_start_tile : {start_tile}')
@@ -398,8 +399,8 @@ def next_tile(play_map) :
     
     play_map = next_tile_security(play_map)
     
-    if 'test_random_path' in debug : return metrics
-    if 'debug_map' in debug and play_map['me'] : debug_map(test)
+    if i_test_random_path : return metrics
+    if i_show_search_map and play_map['me'] : show_search_map(test)
     if 'debug_path' in debug and play_map['me'] : debug_path(test)
     
     if play_map['start'] : 
@@ -522,7 +523,7 @@ def config_search_map(play_map) :
         non_tested, sample = sampling(play_map)
         
         for tile in sample :
-            if off_side_max(tile, play_map['direction_path_extending']) and not 'test_random_path' in debug :
+            if off_side_max(tile, play_map['direction_path_extending']) and not i_test_random_path :
                 play_map['search_map'][tile] = 0 
             else :  
                 result = run_path(tile, play_map)
@@ -863,19 +864,13 @@ def add_message(my_play_map, his_play_map) :
 "DEBUG" 
 
 def debug_menu(test_mod          = False,   start            = False, game_loop        = False,
-               test_heat_map     = False,  debug_path       = False, show_test_s_m  = False,
-               check_random_path = False,  test_random_path  = False, debug_map        = False,
-                                                                                           ) :
+               debug_path       = False, check_random_path = False) :
     global debug
     key = list()
     if test_mod          : key.append('test_mod')
     if start             : key.append('start')
     if game_loop         : key.append('game_loop')
-    if show_test_s_m  : key.append('show_test_s_m')
     if check_random_path : key.append('check_random_path')
-    if test_random_path  : key.append('test_random_path')
-    if test_heat_map     : key.append('test_heat_map')
-    if debug_map         : key.append('debug_map') 
     if debug_path        : key.append('debug_path')
     debug = key if test_mod else []
 
@@ -901,7 +896,7 @@ def create_input(my_play_map, his_play_map) :
     return input_
 
 def next_tile_recorder(test_value, try_, temp_play_map, metrics, test) :
-    if 'test_random_path' in debug or 'debug_map' in debug or 'debug_path' in debug :
+    if i_test_random_path or i_show_search_map or 'debug_path' in debug :
         if temp_play_map['value'] > test_value :
             test_value = temp_play_map['value']
             time_ = perf_counter() - i_time
@@ -947,9 +942,9 @@ def check_search_map() :
         test_play_map = config_search_map(test_play_map)
         test = all( true_result[label][tile] == test_play_map['search_map'][tile] 
                    for tile in test_play_map['search_map'])
-        if show_test_s_m : 
+        if i_show_test_search_map : 
             print(f" test {label} : {test}")
-            debug_map(test_play_map)
+            show_search_map(test_play_map)
         else : 
             test_list[label] = test
     if all(test_list.values()) : 
@@ -980,7 +975,7 @@ def check_random_path() :
 
 # debug
 
-def debug_map(test_play_map) :
+def show_search_map(test_play_map) :
     """
     give graphics overview of the value of each tiles, content is a dic with tuple (x,y) as key
     At start next_tiles function make a direction_path ('direction_path') and seek where this direction
@@ -988,7 +983,7 @@ def debug_map(test_play_map) :
     In game loop show where the submarine could be on the map 
     """
 
-    print("debug_map in next_tile() at debug_map")
+    print("show_search_map in next_tile()")
     for y in range(game_map['size']):
         line = []
         for x in range(game_map['size']):
