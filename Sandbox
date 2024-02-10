@@ -1,19 +1,29 @@
 # voir interaction entre play_map['path_extending'] et add_direction path. Un truc qui cloche
 
+"game controller"
+
+# show message :
+i_instruction = True
+i_show_his_search_map = True
+
+# automatic message :
+i_next_tile_security = False
+
+
 def main():
     g_timer()
     config_constant()
     config_global_var()
     
-    message_context(show_his_search_map = True)
+    
     
     debug_menu(test_mod          = True ,  start             = True , game_loop        = True ,
-               check_search_map  = False,  test_heat_map     = False, debug_path       = False, no_sampling = False, 
+               show_test_s_m  = False,  test_heat_map     = False, debug_path       = False, no_sampling = False, 
                check_random_path = False,  test_random_path  = False, debug_map        = False, show_island = False,
                                                                       debug_run_path   = False                       )
     
+    if debug : check_search_map()
     config_game_map()
-    if 'check_search_map'  in debug : return check_search_map()
     if 'check_random_path' in debug : return check_random_path()
     if 'test_random_path'  in debug : return test_random_path()
     if 'test_heat_map'     in debug : return test_heat_map() 
@@ -68,6 +78,7 @@ def start() :
 def game_loop(my_play_map, his_play_map) :
     global lap
     lap = 0
+    if debug : print(f"lap : {lap}")
     my_play_map['start'] = False
     his_play_map['start'] = False
     while i_start :
@@ -122,7 +133,7 @@ def he_play(my_play_map, his_play_map) :
             his_play_map = update_sector(his_play_map, 'sector_in', sector) 
         else :
             if order_cursor[0] == 'MOVE' : 
-                his_play_map['next_direction'] = order_cursor[1]
+                his_play_map['next_direction'] = dir_converter(order_cursor[1])
             if order_cursor[0] == 'SILENCE' : 
                 his_play_map['silence'] = True
             if order_cursor[0] == 'SONAR' : 
@@ -167,18 +178,16 @@ def i_play(my_play_map, his_play_map) :
         # evaluer silence
         my_play_map = silence_decision(my_play_map, his_play_map)
         
-        
-        
     if debug : print(f"my order  : '{order}' ({round(perf_counter()-i_time,3)})")
     else : print(order)
     my_play_map = update_play_map(my_play_map, his_play_map)
     return  my_play_map
 
-def surface_decision(my_play_map) :
-    neighbor_tiles = update_path(my_play_map['position'], tools['manhattan'])
+def surface_decision(play_map) :
+    neighbor_tiles = update_path(play_map['position'], tools['manhattan'])
     surface = True
     for tile in neighbor_tiles :
-        if not blocking(tile, my_play_map,  lap) : surface = False
+        if not blocking(tile, play_map,  lap) : surface = False
     return surface
 
 def power_decision(my_play_map, his_play_map) :
@@ -254,7 +263,7 @@ def init_play_map(me, start) :
                 'life'                      : int(),
                 'keys_list'                 : list()}
             
-    if me :
+    if me or debug:
         play_map.update({'torpedo_cooldown'          : C['torpedo_cooldown'],
                          'sonar_cooldown'            : C['sonar_cooldown'],    
                          'silence_cooldown'          : C['silence_cooldown'],
@@ -319,6 +328,9 @@ def update_play_map(play_map, opp_play_map) :
     if type(play_map['main'])  is not bool  : raise Exception(f"{play_map['main']} is not valid")
     if type(play_map['start']) is not bool  : raise Exception(f"{play_map['start']} is not valid")
     
+    if debug :
+        play_map['position'] = add_tuple(play_map['position'], play_map['next_direction'])
+    
     play_map = add_to_direction_path(play_map)
     
     if play_map['silence'] :
@@ -335,9 +347,6 @@ def update_play_map(play_map, opp_play_map) :
     if play_map['me'] or debug :
         play_map['target'] = config_target(play_map, opp_play_map)
         play_map['opp_heat_map'] = config_heat_map(opp_play_map)
-    
-    if debug :
-        play_map['position'] = add_tuple(play_map['position'], play_map['next_direction'])
     
     if play_map['me'] :
         if play_map['position'] not in play_map['last_tiles'] : play_map['last_tiles'].append(play_map['position'])
@@ -377,7 +386,9 @@ def next_tile(play_map) :
             open_1 = test_time(temp_play_map)
     
         except : break
-
+    
+    play_map = next_tile_security(play_map)
+    
     if 'test_random_path' in debug : return metrics
     if 'debug_map' in debug and play_map['me'] : debug_map(test)
     if 'debug_path' in debug and play_map['me'] : debug_path(test)
@@ -480,6 +491,17 @@ def hunting(temp_play_map, play_map) :
         if play_map['opp_heat_map'].get(tile) : hunting_value.append(play_map['opp_heat_map'][tile])
     return stat.mean(hunting_value)
 
+def next_tile_security(play_map) :
+    global i_next_tile_security
+    if play_map['next_direction'] : return play_map
+    else :
+        i_next_tile_security = True
+        for direction in tools['manhattan'] :
+            tile = add_tuple(play_map['position'], direction)
+            if not blocking(tile) :
+                play_map['next_direction'] = direction
+                return play_map
+
 " SEARCH MAP"
 
 def config_search_map(play_map) :        
@@ -512,7 +534,7 @@ def config_search_map(play_map) :
 
 def sampling(play_map) :
     if (play_map['start'] or len(play_map['search_area']) < C['samp_floor'] or 'no_sampling' in debug
-        or 'check_search_map' in debug) :
+        or check_search_map) :
         non_tested, sample = [], play_map['search_area'] 
     else : non_tested, sample  = train_test_split(play_map['search_area'], test_size=C['sampling'])
     return non_tested, sample
@@ -633,7 +655,7 @@ def config_game_map() :
         size = C['size_map']
         weights = [normal_law(i,s2=5,mu=20) for i in range(40)] 
         tiles = [(x,y) for x in range(size) for y in range(size)]
-        if 'check_search_map' in debug :
+        if check_search_map :
             island = [(x,y) for x in range(6,9) for y in range(6,9)]
         else :
             num_island = random.choices([i for i in range(40)], weights)
@@ -716,6 +738,7 @@ def add_to_direction_path(play_map) :
     next_direction = play_map['next_direction']
     reversed_direction = reverse_direction(next_direction)
     play_map['direction_path'].insert(0, reversed_direction)
+    play_map['next_direction'] = tuple()
     return play_map
 
 def dir_converter(key) :
@@ -744,7 +767,8 @@ def off_side_max(tile, direction_path_extending) :
     e_w, n_s = direction_path_extending
     e_w += tile[0]
     n_s += tile[1]
-    if 'check_search_map' not in debug : return False
+    # memo
+    if check_search_map : return False
     else : return (e_w not in range(0,size) or n_s not in range(0,size))
 
 def off_side_tile (tile) :
@@ -818,18 +842,19 @@ def torpedo_area(ref_position) :
 
 "MESSAGE CONTEXT"
 
-def message_context(show_his_search_map = False ) :
-    global instruction
-    if show_his_search_map : instruction = 'show_his_search_map'
-    
-
 def add_message(my_play_map, his_play_map) :
-    if instruction == 'show_his_search_map' : return f" | MSG {len(his_play_map['search_area'])}"
+    global i_instruction, i_show_his_search_map, i_next_tile_security
+    if i_instruction : order = " | MSG "
+    if i_show_his_search_map : order += f"1.{len(his_play_map['search_area'])} "
+    if i_next_tile_security : 
+        order += "2.secu "
+        i_next_tile_security = False
+    return order
 
 "DEBUG" 
 
 def debug_menu(test_mod          = False,   start            = False, game_loop        = False,
-               check_search_map  = False,  test_heat_map     = False, debug_path       = False, no_sampling = False, 
+               test_heat_map     = False,  debug_path       = False, no_sampling = False, show_test_s_m  = False,
                check_random_path = False,  test_random_path  = False, debug_map        = False, show_island = False,
                                                                       debug_run_path   = False                       ) :
     global debug
@@ -837,7 +862,7 @@ def debug_menu(test_mod          = False,   start            = False, game_loop 
     if test_mod          : key.append('test_mod')
     if start             : key.append('start')
     if game_loop         : key.append('game_loop')
-    if check_search_map  : key.append('check_search_map')
+    if show_test_s_m  : key.append('show_test_s_m')
     if check_random_path : key.append('check_random_path')
     if test_random_path  : key.append('test_random_path')
     if test_heat_map     : key.append('test_heat_map')
@@ -849,10 +874,9 @@ def debug_menu(test_mod          = False,   start            = False, game_loop 
     debug = key if test_mod else []
 
 def create_input(my_play_map, his_play_map) :
-    his_play_map = next_tile(his_play_map)
-    
-    if not his_play_map['next_direction'] :  order = "SURFACE"
+    if surface_decision(his_play_map) :  order = f"SURFACE {tile_sector_converter(his_play_map['position'])}"
     else :
+        his_play_map = next_tile(his_play_map)
         order = f"MOVE {dir_converter(*his_play_map['next_direction'])} SILENCE"
         his_play_map = silence_decision(his_play_map, my_play_map)
         if his_play_map['silence'] :
@@ -887,8 +911,11 @@ def next_tile_recorder(test_value, try_, temp_play_map, metrics, test) :
 # check
 
 def check_search_map() :
-    global lap
+    global lap, test_game_map
     lap = 0
+    test_game_map = True
+    config_game_map()
+    test_list = {}
     true_result = { 
         'sector_in'    : {  xy   : 1 if tile_sector_converter(xy) == 2 else 0 for xy in game_map['sea']},
         'sector_out'   : {  xy   : 0 if tile_sector_converter(xy) == 2 else 1 for xy in game_map['sea']},
@@ -914,8 +941,15 @@ def check_search_map() :
         test_play_map = config_search_map(test_play_map)
         test = all( true_result[label][tile] == test_play_map['search_map'][tile] 
                    for tile in test_play_map['search_map'])
-        print(f" test {label} : {test}")
-        # debug_map(test_play_map)
+        if 'show_test_s_m' in debug : 
+            print(f" test {label} : {test}")
+            debug_map(test_play_map)
+        else : 
+            test_list[label] = test
+    if all(test_list.values()) : 
+        print('check_search_map')
+        test_game_map = False
+    else : raise Exception(f"check_search_map : {test_list}")
         
 def check_random_path() :
     play_map = init_play_map('debug', 'debug')
