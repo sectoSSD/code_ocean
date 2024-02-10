@@ -10,10 +10,11 @@ i_show_his_search_map = True
 
 # test :
 i_next_tile_security = False
+i_check_search_map = False # don not touch
 i_test_heat_map     = False
 
 # show
-i_show_island = True
+i_show_island = False
 i_show_run_path = False # ne doit prendre qu'un tour
 i_show_search_map = False
 i_show_test_search_map = False
@@ -94,14 +95,14 @@ def game_loop(my_play_map, his_play_map) :
     his_play_map['start'] = False
     while i_start :
         my_play_map, his_play_map = game_input(my_play_map, his_play_map)
-        my_play_map = i_play(my_play_map, his_play_map)
         his_play_map = he_play(my_play_map, his_play_map)
+        my_play_map = i_play(my_play_map, his_play_map)
         test_time(my_play_map)
         lap += 1
     while not i_start or debug :
         my_play_map, his_play_map = game_input(my_play_map, his_play_map)
-        his_play_map = he_play(my_play_map, his_play_map)
         my_play_map = i_play(my_play_map, his_play_map)
+        his_play_map = he_play(my_play_map, his_play_map)
         test_time(my_play_map)
         lap += 1
         if debug :
@@ -398,7 +399,9 @@ def next_tile(play_map) :
     
         except : break
     
-    play_map = next_tile_security(play_map)
+    if not play_map['start'] :
+        play_map = next_tile_security(play_map)
+
     
     if i_test_random_path : return metrics
     if i_show_search_map and play_map['me'] : show_search_map(test)
@@ -672,7 +675,7 @@ def config_game_map() :
             num_island = random.choices([i for i in range(40)], weights)
             island = random.sample(tiles, *num_island)
         sea = [xy for xy in tiles if xy not in island]
-    if i_show_island and not i_check_search_map : print(f"island : {island}")
+    if i_show_island and debug and not i_check_search_map : print(f"island : {island}")
     i_start = bool(my_id)
     game_map = {'island' : island, 'size' : size,'sea' : sea}
 
@@ -742,8 +745,9 @@ def add_tuple(tuple_1, tuple_2) :
     return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
 
 def reverse_direction(direction) :
-    if len(direction[0]) != 2 : raise Exception(f"{direction} not valid")
-    return [(direction[0][0] * -1 , direction[0][1] * -1)]
+    if type(direction) is list and len(direction) == 1 :
+        direction = direction[0]
+    return [(direction[0] * -1 , direction[1] * -1)]
 
 def add_to_direction_path(play_map) :
     next_direction = play_map['next_direction']
@@ -856,9 +860,9 @@ def torpedo_area(ref_position) :
 def add_message(my_play_map, his_play_map) :
     global i_instruction, i_show_his_search_map, i_next_tile_security
     if i_instruction : order = " | MSG "
-    if i_show_his_search_map : order += f"1.{len(his_play_map['search_area'])} "
+    if i_show_his_search_map : order += f"SM{len(his_play_map['search_area'])} "
     if i_next_tile_security : 
-        order += "2.secu "
+        order += "SECU "
         i_next_tile_security = False
     return order
 
