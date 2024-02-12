@@ -13,7 +13,7 @@ from time import perf_counter
 DEBUG = True
 MESSAGE = True
 
-MSG = {'his_search_map' : False}
+MSG = {'his_search_map' : True}
 OPT = {'sampling' : True, 'start' : True, 'game_loop' : True}
 TEST = {'heat_map' : False, 'next_tile' : False, 'random_path' : False} # random_path doesn't work
 SHOW = {'island' : False, 'run_path' : False, 'search_map' : False, 'test_search_map' : False, 'path' : False }
@@ -84,16 +84,10 @@ def game_loop(my_play_map, his_play_map) :
     if DEBUG : print(f"lap : {lap}")
     my_play_map['start'] = False
     his_play_map['start'] = False
-    while i_start :
+    while True :
         my_play_map, his_play_map = game_input(my_play_map, his_play_map)
         his_play_map = he_play(my_play_map, his_play_map)
         my_play_map = i_play(my_play_map, his_play_map)
-        test_time(my_play_map)
-        lap += 1
-    while not i_start or DEBUG :
-        my_play_map, his_play_map = game_input(my_play_map, his_play_map)
-        my_play_map = i_play(my_play_map, his_play_map)
-        his_play_map = he_play(my_play_map, his_play_map)
         test_time(my_play_map)
         lap += 1
         if DEBUG :
@@ -128,6 +122,7 @@ def game_input(my_play_map, his_play_map) :
 
 def he_play(my_play_map, his_play_map) :
     i_timer()
+    if his_play_map['order'] == 'NA' : return his_play_map
     message_order = [cursor.split() for cursor in his_play_map['order'].split('|')]
     for order_cursor in message_order :
         if order_cursor[0] == 'SURFACE' :
@@ -246,9 +241,9 @@ def init_play_map(me, start) :
                 'main'                      : True, # 'main' : his_play_map, my_play_map / temp : temp_play_map
                 'start'                     : start,
 
-                'direction_path'            : [ [(0,0)] ],
-                'direction_path_length'     : 1,
-                'direction_path_extending'  : (0,0),
+                'direction_path'            : list(),
+                'direction_path_length'     : int(),
+                'direction_path_extending'  : tuple(),
                 'fork'                      : list(),
             
                 'next_direction'            : list(),
@@ -656,7 +651,7 @@ def config_game_map() :
         sea = [(1,1),(1,2),(1,3),(2,3),(3,3),(3,4),(3,5),(3,6),(4,6),(5,6),(6,6),(7,6),(7,7)]
         island = [(x,y) for x in range(size) for y in range(size) if (x,y) not in sea]
     else : 
-        my_id = 0
+        my_id = random.randint(0,1)
         size = C['size_map']
         weights = [normal_law(i,s2=5,mu=20) for i in range(40)] 
         tiles = [(x,y) for x in range(size) for y in range(size)]
@@ -667,7 +662,7 @@ def config_game_map() :
             island = random.sample(tiles, *num_island)
         sea = [xy for xy in tiles if xy not in island]
     if SHOW['island'] and DEBUG and not DFLT['check_search_map'] : print(f"island : {island}")
-    i_start = bool(my_id)
+    i_start = True if not my_id else False
     game_map = {'island' : island, 'size' : size,'sea' : sea}
 
 " TOOLS"
@@ -863,7 +858,8 @@ def add_message(my_play_map, his_play_map) :
 "DEBUG" 
 
 def create_input(my_play_map, his_play_map) :
-    if surface_decision(his_play_map) :  order = f"SURFACE {tile_sector_converter(his_play_map['position'])}"
+    if i_start == True and lap == 0 : order = 'NA'
+    elif surface_decision(his_play_map) :  order = f"SURFACE {tile_sector_converter(his_play_map['position'])}"
     else :
         his_play_map = next_tile(his_play_map)
         order = f"MOVE {dir_converter(*his_play_map['next_direction'])} SILENCE"
@@ -880,7 +876,6 @@ def create_input(my_play_map, his_play_map) :
                'mine_cooldown'    : my_play_map['mine_cooldown'],
                'sonar_result'     : 'NA',
                'his_order'        : order }
-    if lap == 0 and i_start == True : input_.update({'his_order' : 'NA'})
     return input_
 
 def next_tile_recorder(test_value, try_, temp_play_map, metrics, test) :
@@ -919,13 +914,14 @@ def check_search_map() :
     cursor_list = list(zip(label_list, value_list))
     for label, value in cursor_list :
         test_play_map = init_play_map(me = True, start = False)
-        if label in ['sector_in', 'sector_out'] : test_play_map[value] = {0 : 2}
-        elif label == 'sector_tiles' : test_play_map['sector_tiles'] = {0 : torpedo_area((10,7))}
-        else : 
-            direction_path = [value for _ in range(C['size_map'] - 1) ]
-            test_play_map['direction_path'] = direction_path
-            test_play_map['direction_path_length'] = len(direction_path)
-            test_play_map['direction_path_extending'] = extending(direction_path)
+        if label in ['sector_in', 'sector_out', 'sector_tiles'] : 
+            direction_path =  [[(0,0)]]
+            if label in ['sector_in', 'sector_out'] : test_play_map[value] = {0 : 2}
+            elif label == 'sector_tiles' : test_play_map['sector_tiles'] = {0 : torpedo_area((10,7))}
+        else : direction_path = [value for _ in range(C['size_map'] - 1) ]
+        test_play_map['direction_path'] = direction_path
+        test_play_map['direction_path_length'] = len(direction_path)
+        test_play_map['direction_path_extending'] = extending(direction_path)
             
         test_play_map = config_search_map(test_play_map)
         test = all( true_result[label][tile] == test_play_map['search_map'][tile] 
