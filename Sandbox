@@ -16,8 +16,8 @@ MESSAGE = True
 MSG = {'his_search_map' : True}
 OPT = {'sampling' : True, 'start' : True, 'game_loop' : True}
 TEST = {'heat_map' : False, 'next_tile' : False, 'random_path' : False} # random_path doesn't work
-SHOW = {'island' : False, 'run_path' : False, 'search_map' : False, 'test_search_map' : False, 'path' : False }
-DFLT = {'next_tile_security' : False, 'check_search_map' : False} # do not touch
+SHOW = {'island' : False, 'run_path' : False, 'search_map' : False, 'test_search_map' : True, 'path' : False }
+DFLT = {'next_tile_security' : False, 'check_search_map' : True} # do not touch
 
 "constant"
 
@@ -39,7 +39,7 @@ def config_constant() :
         'num_test'         : 60,          # number of tests in debug_map_process
         'max_laps'         : 20,          # duration of the game_loop
         'sampling'         : 0.1,         #
-        'samp_floor'       : 0.25*(15*15),
+        'samp_floor'       : 0.25*(15*15), # all_tiles .....
         'rep_heat_map'     : 14,
         'max_time_hm'      : 0.0055,
         'sonar_floor'      : 75,
@@ -329,12 +329,16 @@ def update_play_map(play_map, opp_play_map) :
     if DEBUG :
         play_map['position'] = add_tuple(play_map['position'], play_map['next_direction'])
     
-    play_map = add_to_direction_path(play_map)
-    
-    if play_map['silence'] :
+    if not play_map['silence'] : 
+        next_direction = play_map['next_direction']
+        reversed_direction = reverse_direction(next_direction)
+        play_map['direction_path'].insert(0, reversed_direction)
+    else :
         play_map['direction_path'].insert(0, tools['silence_tiles'])
         play_map.update({ 'search_area' : game_map['sea'], 
                           'silence'     : False })
+    
+    play_map['next_direction'] = tuple()
     
     play_map.update({
     'direction_path_length'    : len(play_map['direction_path']),
@@ -513,16 +517,15 @@ def config_search_map(play_map) :
         non_tested, sample = sampling(play_map)
         
         for tile in sample :
+            tested_tile += 1
             if off_side_max(tile, play_map['direction_path_extending']) and not TEST['random_path'] :
                 play_map['search_map'][tile] = 0 
             else :  
                 result = run_path(tile, play_map)
                 play_map['search_map'][tile] = result
                 positiv_result += result
-                tested_tile += 1
                 if result : temp_search_area.append(tile)
-        try : probability = round(positiv_result / tested_tile, 2)
-        except ZeroDivisionError : probability = 0
+        probability = round(positiv_result / tested_tile, 2)
         if probability > 1 - poll_rate or not non_tested :
             for tile in non_tested : play_map['search_map'][tile] = probability
             play_map['search_area'] = [*temp_search_area, *non_tested]
@@ -533,10 +536,9 @@ def config_search_map(play_map) :
             poll_rate += C['sampling']
 
 def sampling(play_map) :
-    if (play_map['start'] or len(play_map['search_area']) < C['samp_floor'] or not OPT['sampling']
-        or DFLT['check_search_map']) :
-        non_tested, sample = [], play_map['search_area'] 
-    else : non_tested, sample  = train_test_split(play_map['search_area'], test_size=C['sampling'])
+    if play_map['start'] or len(play_map['search_area']) < C['samp_floor'] or not OPT['sampling'] :
+        non_tested, sample = [], game_map['sea'] 
+    else : non_tested, sample  = train_test_split(game_map['sea'], test_size=C['sampling'])
     return non_tested, sample
 
 def run_path(tile, play_map) :
@@ -735,13 +737,6 @@ def reverse_direction(direction) :
         direction = direction[0]
     return [(direction[0] * -1 , direction[1] * -1)]
 
-def add_to_direction_path(play_map) :
-    next_direction = play_map['next_direction']
-    reversed_direction = reverse_direction(next_direction)
-    play_map['direction_path'].insert(0, reversed_direction)
-    play_map['next_direction'] = tuple()
-    return play_map
-
 def dir_converter(key) :
     # NB : can't put list of tuple as key
     if type(key) is list and len(key) == 1 : key = key[0]
@@ -895,8 +890,9 @@ def next_tile_recorder(test_value, try_, temp_play_map, metrics, test) :
 # check
 
 def check_search_map() :
-    global lap, DFLT
+    global lap, DFLT, OPT
     lap = 0
+    OPT.update({'sampling' : True, 'game_loop' : False})
     DFLT['check_search_map'] = True
     config_game_map()
     test_list = {}
