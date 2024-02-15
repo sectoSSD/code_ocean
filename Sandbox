@@ -17,16 +17,17 @@ MESSAGE = True
 
 # instruction
 MSG = {'his_search_map' : True}
-OPT = {'sampling' : True, 'start' : True, 'game_loop' : True, 'one_pth' : True}
+OPT = {'sampling' : True, 'start' : True, 'game_loop' : True, 'one_path' : True}
+SHOW = {'island' : False, 'path' : False}
 TEST = {'heat_map' : False, 'next_tile' : False, 'random_path' : False}
-SHOW = {'island' : False, 'run_path' : False, 'search_map' : False, 'check_search_map' : True, 'path' : False }
+DSPL = {'check_search_map' : False, 'run_path' : False, 'path' : False , 'search_map' : False}
 DFLT = {'next_tile_security' : False, 'check_search_map' : False} # do not touch
 
 # constant
 MAP = {'torpedo' : 5, 'size' : 15}
 COOLDOWN = {'torpedo' : 3, 'sonar' : 4, 'silence' : 6, 'mine' : int(),}
 TIME = { 'start' : 0.65, 'start_limit' : 0.999, 'turn' : 0.025, 'turn_limit' : 0.049, 'heat_map' : 0.0055}
-FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12}
+FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12, 'torpedo_pwr' : 36, 'silence_pwr' : 36}
 NUM = {'length' : 10, 'test' : 60, 'laps' : 20, 'sampling' : 0.1, 'heat_map' : 14}  
 
 def main():
@@ -38,7 +39,7 @@ def main():
     if TEST['next_tile'] : return test_next_tile()
     if TEST['heat_map'] : return test_heat_map() 
     if OPT['start'] : my_play_map, his_play_map = start()
-    if OPT['game_loop'] and not SHOW['search_map'] and not SHOW['path'] :
+    if OPT['game_loop'] and not DSPL['search_map'] and not DSPL['path'] :
         game_loop(my_play_map, his_play_map)
     g_timer('print')
 
@@ -51,7 +52,7 @@ def start() :
     my_play_map = next_tile(my_play_map)
     start_tile = my_play_map['position']
     if not DEBUG : print(*start_tile, sep = ' ')  
-    elif SHOW['path'] or SHOW['search_map'] : print(f'my_start_tile : {start_tile}')
+    elif DSPL['path'] or DSPL['search_map'] : print(f'my_start_tile : {start_tile}')
     else : 
         i_timer()
         print(f'my_start_tile : {start_tile}')
@@ -107,7 +108,7 @@ def he_play(my_play_map, his_play_map) :
     for order_cursor in message_order :
         if order_cursor[0] == 'SURFACE' :
             sector = int(order_cursor[1])
-            his_play_map = surface_play_map(his_play_map, sector)
+            his_play_map = surface_play_map(his_play_map)
             his_play_map = update_sector(his_play_map, 'sector_in', sector) 
         else :
             if order_cursor[0] == 'MOVE' : 
@@ -134,7 +135,7 @@ def i_play(my_play_map, his_play_map) :
     if surface_decision(my_play_map) : 
         order = 'SURFACE'
         sector = tile_sector_converter(my_play_map['position'])
-        my_play_map = surface_play_map(my_play_map, sector)
+        my_play_map = surface_play_map(my_play_map)
         my_play_map = update_sector(my_play_map, 'sector_in', sector) 
     else :
         # pas bien fait parce qu'on modifie direction path, position ... avant d'avoir appliquer l'order.
@@ -169,8 +170,8 @@ def surface_decision(play_map) :
     return surface
 
 def power_decision(my_play_map, his_play_map) :
-    silence_power = False if my_play_map['search_size'] > 36 else True # memo
-    torpedo_power = False if my_play_map['search_size'] > 36 else True
+    silence_power = False if my_play_map['search_size'] > FLOOR['silence_pwr'] else True
+    torpedo_power = False if my_play_map['search_size'] > FLOOR['torpedo_pwr'] else True
     if silence_power and my_play_map['silence_cooldown'] > 0 : power = 'SILENCE'
     elif torpedo_power and my_play_map['torpedo_cooldown'] > 0 : power = 'TORPEDO'
     elif my_play_map['sonar_cooldown']   > 0 : power = 'SONAR'
@@ -371,8 +372,8 @@ def next_tile(play_map) :
 
     
     if TEST['random_path'] : return metrics
-    if SHOW['search_map'] and play_map['me'] : show_search_map(test)
-    if SHOW['path'] and play_map['me'] : show_path(test)
+    if DSPL['search_map'] and play_map['me'] : display_search_map(test)
+    if DSPL['path'] and play_map['me'] : display_path(test)
     
     if play_map['start'] : 
         play_map['position'] = random.choice(ref_search_area)
@@ -538,10 +539,10 @@ def run_path(tile, play_map) :
         "C : bout de path : " 
         controller['end_path'] = True if cursor['idx'] == play_map['direction_path_length'] - 1 else False
 
-        if SHOW['run_path'] : show_run_path(controller, cursor, fork_map, tile)
+        if DSPL['run_path'] : display_run_path(controller, cursor, fork_map, tile)
             
         if controller['end_path'] == True and controller['blocking'] == False : 
-            if OPT['one_pth'] : return 1.00
+            if OPT['one_path'] : return 1.00
             else : search_map += 1.00
         
         if controller['stop'] == False :
@@ -838,7 +839,7 @@ def loop(my_play_map, his_play_map) :
         temp = {tile : 'X' if tile in MAP['island'] else '_' for tile in MAP['tiles']}
         temp.update({val : idx for idx, val in enumerate( my_play_map['last_tiles'])})
         temp.update({val : idx for idx, val in enumerate(his_play_map['last_tiles'])})
-        print_map(temp)
+        if SHOW['path'] : print_map(temp)
         return True
 
 def print_map(map_) :
@@ -850,13 +851,13 @@ def print_map(map_) :
 
 def create_input(my_play_map, his_play_map) :
     if i_start == True and lap == 0 : order = 'NA'
-    elif surface_decision(his_play_map) :  order = f"SURFACE {tile_sector_converter(his_play_map['position'])}"
+    elif surface_decision(his_play_map) or random.choices([True,False], [1,20])[0] :  
+        order = f"SURFACE {tile_sector_converter(his_play_map['position'])}"
     else :
         his_play_map = next_tile(his_play_map)
         order = f"MOVE {dir_converter(*his_play_map['next_direction'])} SILENCE"
         his_play_map = silence_decision(his_play_map, my_play_map)
-        if his_play_map['silence'] :
-            order += ' | SILENCE N 0'
+        if his_play_map['silence'] : order += ' | SILENCE N 0'
     
     input_ = { 'position'         : my_play_map['position'],
                'my_life'          : random.randint(1,6) if not my_play_map['life'] else my_play_map['life'],
@@ -870,7 +871,7 @@ def create_input(my_play_map, his_play_map) :
     return input_
 
 def next_tile_recorder(test_value, try_, temp_play_map, metrics, test) :
-    if TEST['random_path'] or SHOW['search_map'] or SHOW['path'] :
+    if TEST['random_path'] or DSPL['search_map'] or DSPL['path'] :
         if temp_play_map['value'] > test_value :
             test_value = temp_play_map['value']
             time_ = perf_counter() - i_time
@@ -879,6 +880,7 @@ def next_tile_recorder(test_value, try_, temp_play_map, metrics, test) :
                        'swing_turn' :  try_ }
             test = {'direction_path' : temp_play_map['direction_path'], 
                     'search_map' : temp_play_map['search_map'], 
+                    'search_size' : temp_play_map['search_size'],
                     'scatter' : temp_play_map['scatter']}
                     # laisser scatter
         metrics.update({'total_turn' : try_, 'total_time' : perf_counter() - i_time}) 
@@ -890,9 +892,9 @@ def check_search_map() :
     if not DEBUG : return
     global lap, DFLT, OPT
     lap = 0
-    # OPT['sampling'] = False
+    OPT['sampling'] = False
     DFLT['check_search_map'] = True
-    if SHOW['check_search_map'] : OPT['game_loop'] = False
+    if DSPL['check_search_map'] : OPT['game_loop'] = False
     config_map()
     
     test_list = {}
@@ -928,13 +930,13 @@ def check_search_map() :
         
         test = all( true_result[label][tile] == test_play_map['search_map'][tile] 
                    for tile in test_play_map['search_map'])
-        if SHOW['check_search_map'] : 
-            print(f" test {label} : {test}")
-            show_search_map(test_play_map)
+        if DSPL['check_search_map'] : 
+            print(f"test {label} : {test}\n")
+            display_search_map(test_play_map)
         else : 
             test_list[label] = test
     if all(test_list.values()) : 
-        print('check_search_map')
+        print('check_search_map\n')
         DFLT['check_search_map'] = False
         OPT['sampling'] = True
     else : raise Exception(f"check_search_map : {test_list}")
@@ -942,7 +944,7 @@ def check_search_map() :
 def silence_result() :
     silence_result = {}
     for x,y in MAP['sea'] :
-        if OPT['one_pth'] :
+        if OPT['one_path'] :
             if x == 0 : silence_result.update({(x,y) : 1})
             elif 0 < x < 5 and (y < 6 or 8 < y) : silence_result.update({(x,y) : 1})
             else : silence_result.update({(x,y) : 0})
@@ -978,7 +980,7 @@ def test_random_path() :
 
 # debug
 
-def show_search_map(test_play_map) :
+def display_search_map(test_play_map) :
     """
     give graphics overview of the value of each tiles, content is a dic with tuple (x,y) as key
     At start next_tiles function make a direction_path ('direction_path') and seek where this direction
@@ -986,7 +988,7 @@ def show_search_map(test_play_map) :
     In game loop show where the submarine could be on the map 
     """
 
-    print("show_search_map in next_tile()")
+    print("display_search_map in next_tile()")
     for y in range(MAP['size']):
         line = []
         for x in range(MAP['size']):
@@ -995,12 +997,12 @@ def show_search_map(test_play_map) :
                               else f"{int(test_play_map['search_map'][x,y]*100):02}")
             except KeyError : line.append('XX')
         print(*line, sep=' ') 
-    print(f"positive rate : {test_play_map['scatter']} sample_size : {test_play_map['search_size']}")
+    print(f"positive rate : {test_play_map['scatter']} sample_size : {test_play_map['search_size']}\n")
     # laisser scatter
     return
 
-def show_path(test_play_map) :
-    if SHOW['path'] : print("show_path")
+def display_path(test_play_map) :
+    if DSPL['path'] : print("display_path")
     tile_cursor = (0,0)
     path_cursor = [tile_cursor]
     for direction in test_play_map['direction_path'] :
@@ -1017,7 +1019,7 @@ def show_path(test_play_map) :
     spread = round( abs(max_x - min_x) * abs(max_y - min_y) / (MAP['size']**2) , 2)
     spread_length = round( abs(max_x - min_x) * abs(max_y - min_y) / len(path_cursor)**2 , 2)
     
-    if SHOW['path'] :
+    if DSPL['path'] :
         for y in range(max_y + 1) :
             line = []
             for x in range(max_x + 1) :
@@ -1027,7 +1029,7 @@ def show_path(test_play_map) :
             print(*line, sep=' ')
     else : return spread, spread_length
 
-def show_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
+def display_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
         """ 
         Trace what occuring un run_path() which is the function where we test each tile without island
         to know if a given direction path could start or finish in this tile. When status is start we test 
@@ -1079,7 +1081,7 @@ def test_next_tile() :
         for key in indicator : 
             try : metric[key].append(temp[key])
             except KeyError : pass
-        spread, spread_length = show_path(temp)
+        spread, spread_length = display_path(temp)
         metric['path_spread'].append(spread)
         metric['spread_length_ratio'].append(spread_length)
         count += 1
