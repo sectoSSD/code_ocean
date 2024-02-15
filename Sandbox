@@ -8,6 +8,8 @@ from time import perf_counter
 
 # voir interaction entre play_map['path_extending'] et add_direction path. Un truc qui cloche
 
+# voir scatter et target j'y comprend rien
+
 "MENU"
 
 DEBUG = True
@@ -17,7 +19,7 @@ MESSAGE = True
 MSG = {'his_search_map' : True}
 OPT = {'sampling' : True, 'start' : True, 'game_loop' : True, 'one_pth' : True}
 TEST = {'heat_map' : False, 'next_tile' : False, 'random_path' : False}
-SHOW = {'island' : False, 'run_path' : False, 'search_map' : False, 'check_search_map' : False, 'path' : False }
+SHOW = {'island' : False, 'run_path' : False, 'search_map' : False, 'check_search_map' : True, 'path' : False }
 DFLT = {'next_tile_security' : False, 'check_search_map' : False} # do not touch
 
 # constant
@@ -167,8 +169,8 @@ def surface_decision(play_map) :
     return surface
 
 def power_decision(my_play_map, his_play_map) :
-    silence_power = False if len(my_play_map['search_area']) > 36 else True
-    torpedo_power = False if len(his_play_map['search_area']) > 36 else True
+    silence_power = False if my_play_map['search_size'] > 36 else True # memo
+    torpedo_power = False if my_play_map['search_size'] > 36 else True
     if silence_power and my_play_map['silence_cooldown'] > 0 : power = 'SILENCE'
     elif torpedo_power and my_play_map['torpedo_cooldown'] > 0 : power = 'TORPEDO'
     elif my_play_map['sonar_cooldown']   > 0 : power = 'SONAR'
@@ -180,7 +182,7 @@ def power_decision(my_play_map, his_play_map) :
 
 def torpedo_decision(my_play_map, his_play_map) :
     order = ''
-    if len(his_play_map['search_area']) < FLOOR['torpedo'] and my_play_map['torpedo_cooldown'] == 0 :
+    if his_play_map['search_size'] < FLOOR['torpedo'] and my_play_map['torpedo_cooldown'] == 0 :
         torpedo = torpedo_area(my_play_map['position'])
         torpedo_target = []
         for tile in his_play_map['search_area'] :
@@ -199,7 +201,7 @@ def mine_decision() :
 def sonar_decision(my_play_map, his_play_map) :
     if my_play_map['sonar_cooldown'] > 0 : sector = 0
     else :
-        if len(his_play_map['search_area']) > FLOOR['sonar'] :
+        if his_play_map['search_size'] > FLOOR['sonar'] :
             sector = tile_sector_converter(random.choice(his_play_map['search_area']))
         else :
             sector = stat.mode(list(map(lambda tile : tile_sector_converter(tile), his_play_map['search_area'])))
@@ -232,6 +234,7 @@ def init_play_map(me, start) :
             
                 'search_map'                : {key : 1 for key in MAP['sea']},
                 'search_area'               : MAP['sea'],
+                'search_size'               : MAP['sea_size'],
                 'scatter'                   : float(),
             
                 'life'                      : int(),
@@ -275,7 +278,8 @@ def config_temp_play_map(play_map, position, next_direction_path, next_direction
                         'direction_path_extending'      : extending(direction_path),
                         
                         'search_map'                    : dict(),
-                        'search_area'                   : play_map['search_area'],
+                        'search_area'                   : list(),  # play_map['search_area'],
+                        'search_size'                   : list(),  # play_map['search_size'],
                         'scatter'                       : float(),
                         'value'                         : int(),
                         
@@ -283,12 +287,12 @@ def config_temp_play_map(play_map, position, next_direction_path, next_direction
     temp_play_map['keys_list'] = list(temp_play_map)
     return temp_play_map
 
-def surface_play_map(play_map, sector_in) :
+def surface_play_map(play_map) :
     play_map.update({  'next_direction'  : [(0,0)],
                        'direction_path'  : list(),
                        'sector_out'      : dict(),
                        'sector_tiles'    : dict()})
-    if play_map.get('last_tiles') : 
+    if play_map.get('last_tiles') :
         play_map.update({'last_tiles' : list()})
     return play_map
 
@@ -425,6 +429,7 @@ def config_target(play_map, opp_play_map) :
 def config_heat_map(opp_play_map) :
     # sm_mean = stat.fmean(opp_play_map['search_map'].values())
     sm_mean = 1 - opp_play_map['scatter']
+    # memo : distinguer 'scatter' 'probability' pourqu'on comprenne
     opp_heat_map = copy.deepcopy(opp_play_map['search_map'])
     coef = 1 / ( NUM['heat_map'] * 4)
     for repetition in range(NUM['heat_map']) :
@@ -485,6 +490,7 @@ def config_search_map(play_map) :
     positiv_result, tested_tile = 0, 0
     poll_rate = NUM['sampling']
     play_map['search_area'] = MAP['sea']
+    play_map['search_size'] = MAP['sea_size']
     temp_search_area = []
     while True :
         
@@ -501,14 +507,17 @@ def config_search_map(play_map) :
         if probability > 1 - poll_rate or not non_tested :
             for tile in non_tested : play_map['search_map'][tile] = probability
             play_map['search_area'] = [*temp_search_area, *non_tested]
+            play_map['search_size'] = len(play_map['search_area'])
             play_map['scatter'] = 1 - probability
+            # memo : distinguer avec probabilité
             return play_map
         else :
             play_map['search_area'] = non_tested
+            play_map['search_size'] = len(play_map['search_area'])
             poll_rate += NUM['sampling']
 
 def sampling(play_map) :
-    if play_map['start'] or len(play_map['search_area']) < FLOOR['sampling'] or not OPT['sampling'] :
+    if play_map['start'] or play_map['search_size'] < FLOOR['sampling'] or not OPT['sampling'] :
         non_tested, sample = [], play_map['search_area']
     else : non_tested, sample  = train_test_split(play_map['search_area'], test_size = FLOOR['sampling'])
     return non_tested, sample
@@ -644,7 +653,7 @@ def config_map() :
         sea = [xy for xy in tiles if xy not in island]
     if SHOW['island'] and DEBUG and not DFLT['check_search_map'] : print(f"island : {island}")
     i_start = True if not my_id else False
-    MAP.update({'tiles' : tiles, 'island' : island, 'sea' : sea})
+    MAP.update({'tiles' : tiles, 'island' : island, 'sea' : sea, 'sea_size' : len(sea)})
 
 " TOOLS"
 
@@ -814,7 +823,7 @@ def add_message(my_play_map, his_play_map) :
     global DFLT
     if MESSAGE : 
         order = " | MSG "
-        if MSG['his_search_map'] : order += f"SM{len(his_play_map['search_area'])} "
+        if MSG['his_search_map'] : order += f"SM{his_play_map['search_size']} "
         if DFLT['next_tile_security']: 
             order += "SECU "
             DFLT['next_tile_security'] = False
@@ -871,6 +880,7 @@ def next_tile_recorder(test_value, try_, temp_play_map, metrics, test) :
             test = {'direction_path' : temp_play_map['direction_path'], 
                     'search_map' : temp_play_map['search_map'], 
                     'scatter' : temp_play_map['scatter']}
+                    # laisser scatter
         metrics.update({'total_turn' : try_, 'total_time' : perf_counter() - i_time}) 
     return test_value, metrics, test
 
@@ -880,31 +890,31 @@ def check_search_map() :
     if not DEBUG : return
     global lap, DFLT, OPT
     lap = 0
-    OPT['sampling'] = False
+    # OPT['sampling'] = False
     DFLT['check_search_map'] = True
     if SHOW['check_search_map'] : OPT['game_loop'] = False
     config_map()
     
     test_list = {}
     true_result = { 
-        'sector_in'    : {  xy   : 1 if tile_sector_converter(xy) == 2 else 0 for xy in MAP['sea']},
-        'sector_out'   : {  xy   : 0 if tile_sector_converter(xy) == 2 else 1 for xy in MAP['sea']},
-        'torpedo'      : {  xy   : 1 if xy in torpedo_area((10,7)) else 0 for xy in MAP['sea']},
+        'surface'    : {  xy   : 1 if tile_sector_converter(xy) == 2 else 0 for xy in MAP['sea'] },
+        'sector_out'   : {  xy   : 0 if tile_sector_converter(xy) == 2 else 1 for xy in MAP['sea'] },
+        'torpedo'      : {  xy   : 1 if xy in torpedo_area((10,7)) else 0 for xy in MAP['sea'] },
         'silence'      : silence_result(),
-        'E'            : { (x,y) : 0 if x != 0  or 5 < y < 9 else 1 for x,y in MAP['sea']},
-        'W'            : { (x,y) : 0 if x != 14 or 5 < y < 9 else 1 for x,y in MAP['sea']},
-        'S'            : { (x,y) : 0 if y != 0  or 5 < x < 9 else 1 for x,y in MAP['sea']},
-        'N'            : { (x,y) : 0 if y != 14 or 5 < x < 9 else 1 for x,y in MAP['sea']}}
+        'E'            : { (x,y) : 0 if x != 0  or 5 < y < 9 else 1 for x,y in MAP['sea'] },
+        'W'            : { (x,y) : 0 if x != 14 or 5 < y < 9 else 1 for x,y in MAP['sea'] },
+        'S'            : { (x,y) : 0 if y != 0  or 5 < x < 9 else 1 for x,y in MAP['sea'] },
+        'N'            : { (x,y) : 0 if y != 14 or 5 < x < 9 else 1 for x,y in MAP['sea'] }}
     
     label_list = list(true_result)
     value_list = ['sector_in', 'sector_out', 'torpedo', 'silence', *tools['manhattan']]
     cursor_list = list(zip(label_list, value_list))
     for label, value in cursor_list :
         test_play_map = init_play_map(me = True, start = False)
-        if label in ['sector_in', 'sector_out', 'torpedo'] :
+        if label in ['surface', 'sector_out', 'torpedo'] :
             direction_path =  [[(0,0)]]
-            if label in ['sector_in', 'sector_out'] : test_play_map[value] = {0 : 2}
-            elif label == 'torpedo' : test_play_map['sector_tiles'] = {0 : torpedo_area((10,7))}
+            if label in ['surface', 'sector_out'] : test_play_map[value] = {lap : 2}
+            elif label == 'torpedo' : test_play_map['sector_tiles'] = {lap : torpedo_area((10,7))}
         elif label == 'silence' :
             direction_path = [[(1,0)] for _ in range(MAP['size'] - 1) ]
             direction_path.insert(0, tools['silence_tiles'])
@@ -985,8 +995,8 @@ def show_search_map(test_play_map) :
                               else f"{int(test_play_map['search_map'][x,y]*100):02}")
             except KeyError : line.append('XX')
         print(*line, sep=' ') 
-    sample_size = len([i for i in test_play_map['search_map'].values() if i == 0 or i == 1])
-    print(f"positive rate : {test_play_map['scatter']} sample_size : {sample_size}")
+    print(f"positive rate : {test_play_map['scatter']} sample_size : {test_play_map['search_size']}")
+    # laisser scatter
     return
 
 def show_path(test_play_map) :
@@ -1116,6 +1126,7 @@ def test_heat_map() :
             try : positive_rate = round( positive_result / tested, 1)
             except : positive_rate = 0
             opp_play_map['scatter'] = 1 - positive_rate
+            # comprend rien à revoir
             for tile in non_tested : opp_play_map['search_map'][tile] = positive_rate
             opp_play_map['search_area'] = [*tested_and_positive, *non_tested]
             
