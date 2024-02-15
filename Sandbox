@@ -15,9 +15,9 @@ MESSAGE = True
 
 # instruction
 MSG = {'his_search_map' : True}
-OPT = {'sampling' : True, 'start' : True, 'game_loop' : True}
+OPT = {'sampling' : True, 'start' : True, 'game_loop' : True, 'one_pth' : True}
 TEST = {'heat_map' : False, 'next_tile' : False, 'random_path' : False}
-SHOW = {'island' : False, 'run_path' : False, 'search_map' : False, 'check_search_map' : True, 'path' : False }
+SHOW = {'island' : False, 'run_path' : False, 'search_map' : False, 'check_search_map' : False, 'path' : False }
 DFLT = {'next_tile_security' : False, 'check_search_map' : False} # do not touch
 
 # constant
@@ -270,8 +270,6 @@ def config_temp_play_map(play_map, position, next_direction_path, next_direction
                         'next_direction_path_length'    : len(next_direction_path),
                         'next_direction_path_extending' : extending(next_direction_path),
                         
-                        'past_direction_path'           : play_map['direction_path'],
-                        
                         'direction_path'                : direction_path,
                         'direction_path_length'         : len(direction_path),
                         'direction_path_extending'      : extending(direction_path),
@@ -518,12 +516,12 @@ def sampling(play_map) :
 def run_path(tile, play_map) :
     if off_side_max(tile, play_map['direction_path_extending']) and not TEST['random_path'] : return 0.00 
     fork_map = copy.deepcopy(config_fork_map(play_map))
-    cursor = initial_cursor(play_map, fork_map, tile)
+    cursor = initial_cursor(play_map, fork_map, tile)    
     controller = {'blocking' : False,  'end_path' : False, 'stop' : True}
     search_map = 0.00 # possible path for this tile
     while True :
         "A : embranchement : "
-        if fork_map['fork'].get(cursor['idx']) :
+        if fork_map['fork'].get(cursor['idx']) != None :
             fork_map = update_fork_map(cursor['idx'], fork_map)
             controller['stop'] = stop(fork_map)
         "B : obstacle : " 
@@ -533,7 +531,9 @@ def run_path(tile, play_map) :
 
         if SHOW['run_path'] : show_run_path(controller, cursor, fork_map, tile)
             
-        if controller['end_path'] == True and controller['blocking'] == False : search_map += 1.00
+        if controller['end_path'] == True and controller['blocking'] == False : 
+            if OPT['one_pth'] : return 1.00
+            else : search_map += 1.00
         
         if controller['stop'] == False :
             if controller['blocking'] == True or controller['end_path'] == True :
@@ -547,21 +547,22 @@ def run_path(tile, play_map) :
 # cursor
 
 def initial_cursor(play_map, fork_map, tile) :
+
     direction = ( play_map['direction_path'][0][fork_map['fork'][0]-1] 
-                  if fork_map['fork'].get(0)
+                  if fork_map['fork'].get(0) != None
                   else play_map['direction_path'][0][0] )
+
     return {'idx' : int(),
             'lap' : lap if play_map['main'] else None,  
             'dir' : direction,
-            'tile' : add_tuple(tile, direction) 
-           }
+            'tile' : add_tuple(tile, direction) }
 
 
 def update_cursor (cursor, play_map, fork_map) :
     cursor['idx'] += 1
     cursor['lap'] = lap - cursor['idx'] if play_map['main'] else None
     branch_index = (fork_map['fork'][cursor['idx']] 
-                    if fork_map['fork'].get(cursor['idx'])
+                    if fork_map['fork'].get(cursor['idx']) != None
                     else 0)
     cursor['dir'] = play_map['direction_path'][ cursor['idx'] ] [branch_index]
     cursor['tile'] = add_tuple(cursor['tile'], cursor['dir'])
@@ -651,7 +652,7 @@ def config_global_var():
     global tools
     tools = {'manhattan'      : [[(1,0)], [(-1,0)], [(0,1)], [(0,-1)]],
              'euclidean'      : [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)],
-             'silence_tiles'  : list(set([(x,0) for x in range(-4,5)] + [(0,y) for y in range(-4,5)])),
+             'silence_tiles'  : list(set([(x,0) for x in range(-4,5) if x != 0] + [(0,y) for y in range(-4,5) if y != 0])),
              'torpedo_tiles'  : [(x,y) for x in range(-4, 5) for y in range(-4, 5) if abs(x) + abs(y) <= 4 and (x != 0 or y!= 0)]
             }
     return tools
@@ -837,7 +838,6 @@ def print_map(map_) :
         for y in range(MAP['size']) :
             line.append(map_[x,y])
         print(*line, sep = ' ')
-    
 
 def create_input(my_play_map, his_play_map) :
     if i_start == True and lap == 0 : order = 'NA'
@@ -884,31 +884,38 @@ def check_search_map() :
     DFLT['check_search_map'] = True
     if SHOW['check_search_map'] : OPT['game_loop'] = False
     config_map()
+    
     test_list = {}
     true_result = { 
         'sector_in'    : {  xy   : 1 if tile_sector_converter(xy) == 2 else 0 for xy in MAP['sea']},
         'sector_out'   : {  xy   : 0 if tile_sector_converter(xy) == 2 else 1 for xy in MAP['sea']},
-        'sector_tiles' : {  xy   : 1 if xy in torpedo_area((10,7)) else 0 for xy in MAP['sea']},
+        'torpedo'      : {  xy   : 1 if xy in torpedo_area((10,7)) else 0 for xy in MAP['sea']},
+        'silence'      : silence_result(),
         'E'            : { (x,y) : 0 if x != 0  or 5 < y < 9 else 1 for x,y in MAP['sea']},
         'W'            : { (x,y) : 0 if x != 14 or 5 < y < 9 else 1 for x,y in MAP['sea']},
         'S'            : { (x,y) : 0 if y != 0  or 5 < x < 9 else 1 for x,y in MAP['sea']},
         'N'            : { (x,y) : 0 if y != 14 or 5 < x < 9 else 1 for x,y in MAP['sea']}}
     
     label_list = list(true_result)
-    value_list = ['sector_in', 'sector_out', 'sector_tiles', *tools['manhattan']]
+    value_list = ['sector_in', 'sector_out', 'torpedo', 'silence', *tools['manhattan']]
     cursor_list = list(zip(label_list, value_list))
     for label, value in cursor_list :
         test_play_map = init_play_map(me = True, start = False)
-        if label in ['sector_in', 'sector_out', 'sector_tiles'] : 
+        if label in ['sector_in', 'sector_out', 'torpedo'] :
             direction_path =  [[(0,0)]]
             if label in ['sector_in', 'sector_out'] : test_play_map[value] = {0 : 2}
-            elif label == 'sector_tiles' : test_play_map['sector_tiles'] = {0 : torpedo_area((10,7))}
+            elif label == 'torpedo' : test_play_map['sector_tiles'] = {0 : torpedo_area((10,7))}
+        elif label == 'silence' :
+            direction_path = [[(1,0)] for _ in range(MAP['size'] - 1) ]
+            direction_path.insert(0, tools['silence_tiles'])
         else : direction_path = [value for _ in range(MAP['size'] - 1) ]
         test_play_map['direction_path'] = direction_path
+        test_play_map['fork'] = list(idx for idx,dir_ in enumerate(test_play_map['direction_path']) if len(dir_)>1)
         test_play_map['direction_path_length'] = len(direction_path)
         test_play_map['direction_path_extending'] = extending(direction_path)
             
         test_play_map = config_search_map(test_play_map)
+        
         test = all( true_result[label][tile] == test_play_map['search_map'][tile] 
                    for tile in test_play_map['search_map'])
         if SHOW['check_search_map'] : 
@@ -921,7 +928,23 @@ def check_search_map() :
         DFLT['check_search_map'] = False
         OPT['sampling'] = True
     else : raise Exception(f"check_search_map : {test_list}")
-        
+ 
+def silence_result() :
+    silence_result = {}
+    for x,y in MAP['sea'] :
+        if OPT['one_pth'] :
+            if x == 0 : silence_result.update({(x,y) : 1})
+            elif 0 < x < 5 and (y < 6 or 8 < y) : silence_result.update({(x,y) : 1})
+            else : silence_result.update({(x,y) : 0})
+        else :
+            if x == 0 :
+                if   y in [0, 14]   : silence_result.update({(x,y) : 4})
+                elif y in [6, 7, 8] : silence_result.update({(x,y) : 6})
+                else :                silence_result.update({(x,y) : 5})
+            elif x < 5 and (y < 6 or 8 < y) : silence_result.update({(x,y) : 1})
+            else :       silence_result.update({(x,y) : 0})
+    return silence_result
+
 def test_random_path() :
     play_map = init_play_map(me = True, start = False)
     play_map['position'] = (1,1)
@@ -958,7 +981,7 @@ def show_search_map(test_play_map) :
         line = []
         for x in range(MAP['size']):
             try : line.append(f"_{int(test_play_map['search_map'][x,y])}" 
-                              if test_play_map['search_map'][x,y] == 1 or test_play_map['search_map'][x,y] == 0
+                              if test_play_map['search_map'][x,y] >= 1 or test_play_map['search_map'][x,y] == 0
                               else f"{int(test_play_map['search_map'][x,y]*100):02}")
             except KeyError : line.append('XX')
         print(*line, sep=' ') 
