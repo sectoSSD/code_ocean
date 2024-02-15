@@ -9,7 +9,12 @@ from time import perf_counter
 # voir interaction entre play_map['path_extending'] et add_direction path. Un truc qui cloche
 
 # voir scatter et target j'y comprend rien
-
+"""
+LE PROBLEME EST LA ET NE SURVIENT PAS DANS LE CHECK :
+        if not blocking and play_map['sector_in'].get(index) :
+            blocking =  play_map['sector_in'].get(index) != current_sector
+"""
+    
 "MENU"
 
 DEBUG = True
@@ -108,8 +113,7 @@ def he_play(my_play_map, his_play_map) :
     for order_cursor in message_order :
         if order_cursor[0] == 'SURFACE' :
             sector = int(order_cursor[1])
-            his_play_map = surface_play_map(his_play_map)
-            his_play_map = update_sector(his_play_map, 'sector_in', sector) 
+            his_play_map = surface_play_map(his_play_map, sector)
         else :
             if order_cursor[0] == 'MOVE' : 
                 his_play_map['next_direction'] = dir_converter(order_cursor[1])
@@ -117,13 +121,14 @@ def he_play(my_play_map, his_play_map) :
                 his_play_map['silence'] = True
             if order_cursor[0] == 'SONAR' : 
                 sector = int(order_cursor[1])
-                his_play_map = update_sector(his_play_map, 'sector_in', sector) 
+                his_play_map['sector_in'].update({lap : sector})
             if order_cursor[0] == 'TORPEDO' :
                 shoot_tile = int(order_cursor[1]), int(order_cursor[2])
-                his_play_map = update_sector(his_play_map, 'sector_tiles', shoot_tile) 
+                his_play_map['sector_tiles'].update({lap : shoot_tile}) 
             # if Mine in order_cursor : ....
-            if    my_play_map['sonar_result'] == 'Y' : his_play_map['sector_in'][lap - 1]  = my_play_map['sonar']
-            elif  my_play_map['sonar_result'] == 'N' : his_play_map['sector_out'][lap - 1] = my_play_map['sonar']
+            if    my_play_map['sonar_result'] == 'Y' : his_play_map['sector_in'].update({lap - 1 : my_play_map['sonar']})
+            elif  my_play_map['sonar_result'] == 'N' : his_play_map['sector_out'].update({lap - 1 : my_play_map['sonar']})
+            
     his_play_map = update_play_map(his_play_map, my_play_map)
     if DEBUG : print(f"his order : '{his_play_map['order']}' ({round(perf_counter()-i_time,3)})")
     return his_play_map
@@ -135,8 +140,7 @@ def i_play(my_play_map, his_play_map) :
     if surface_decision(my_play_map) : 
         order = 'SURFACE'
         sector = tile_sector_converter(my_play_map['position'])
-        my_play_map = surface_play_map(my_play_map)
-        my_play_map = update_sector(my_play_map, 'sector_in', sector) 
+        my_play_map = surface_play_map(my_play_map, sector)
     else :
         # pas bien fait parce qu'on modifie direction path, position ... avant d'avoir appliquer l'order.
         # move
@@ -193,7 +197,7 @@ def torpedo_decision(my_play_map, his_play_map) :
             ttx, tty = shoot_tile
             if type(ttx) is not int or type(tty) is not int : raise Exception("i_play()/torpedo_target : not int")
             order = f" | TORPEDO {ttx} {ttx}"
-            my_play_map = update_sector(my_play_map, 'sector_tiles', shoot_tile)
+            my_play_map['sector_tiles'].update({lap : shoot_tile})
     return order, my_play_map
 
 def mine_decision() :
@@ -239,6 +243,7 @@ def init_play_map(me, start) :
                 'scatter'                   : float(),
             
                 'life'                      : int(),
+                
                 'keys_list'                 : list()}
             
     if me or DEBUG:
@@ -288,9 +293,10 @@ def config_temp_play_map(play_map, position, next_direction_path, next_direction
     temp_play_map['keys_list'] = list(temp_play_map)
     return temp_play_map
 
-def surface_play_map(play_map) :
+def surface_play_map(play_map, sector) :
     play_map.update({  'next_direction'  : [(0,0)],
                        'direction_path'  : list(),
+                       'sector_in'       : {lap : sector},
                        'sector_out'      : dict(),
                        'sector_tiles'    : dict()})
     if play_map.get('last_tiles') :
@@ -324,6 +330,7 @@ def update_play_map(play_map, opp_play_map) :
     'fork'                     : list(idx for idx,dir_ in enumerate(play_map['direction_path']) if len(dir_)>1) })
     
     play_map = config_search_map(play_map)
+    
     if play_map['me'] or DEBUG :
         play_map['target'] = config_target(play_map, opp_play_map)
         play_map['opp_heat_map'] = config_heat_map(opp_play_map)
@@ -741,11 +748,9 @@ def update_path(tile=(0,0), path = []) :
 # direction path with map
 
 def extending(direction_path) :
-    if direction_path : 
-        e_w = sum([xy[0][0] for xy in direction_path if len(xy) == 1]) 
-        n_s = sum([xy[0][1] for xy in direction_path if len(xy) == 1]) 
-        return e_w, n_s
-    else : return (0,0)
+    e_w = sum([xy[0][0] for xy in direction_path if len(xy) == 1]) 
+    n_s = sum([xy[0][1] for xy in direction_path if len(xy) == 1]) 
+    return e_w, n_s
 
 def off_side_max(tile, direction_path_extending) :
     size = MAP['size']
@@ -788,13 +793,6 @@ def blocking(tile, play_map = None, index = None) :
     return blocking
 
 # sector and area
-
-def update_sector(play_map, command, sector) :
-    if command == 'sector_in' : play_map['sector_in'].update({lap : sector})
-    elif command == 'sector_out' : play_map['sector_out'].update({lap : sector})
-    elif command == 'sector_tiles' : play_map['sector_tiles'].update({lap : sector})
-    else : raise Exception(f"{command} in update_sector")
-    return play_map
 
 def torpedo_area(ref_position) :
     if type(ref_position) is not tuple : raise Exception('bad settings')
