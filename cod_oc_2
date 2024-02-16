@@ -369,7 +369,7 @@ def next_tile(play_map) :
         play_map = next_tile_security(play_map)
 
     
-    if TEST['random_path'] : return metrics
+    if TEST['next_tile'] : return metrics
     if DSPL['search_map'] and play_map['me'] : display_search_map(test)
     if DSPL['path'] and play_map['me'] : display_path(test)
     
@@ -857,7 +857,7 @@ def create_input(my_play_map, his_play_map) :
     return input_
 
 def next_tile_recorder(test_value, try_, temp_play_map, metrics, test) :
-    if TEST['random_path'] or DSPL['search_map'] or DSPL['path'] :
+    if TEST['next_tile'] or DSPL['search_map'] or DSPL['path'] :
         if temp_play_map['value'] > test_value :
             test_value = temp_play_map['value']
             time_ = perf_counter() - i_time
@@ -962,7 +962,7 @@ def test_random_path() :
                 count += 1
             elif (x,y) in MAP['island'] : line.append('x')
             else : line.append('_')
-        print(line)
+        print(*line, sep = ' ')
 
 # debug
 
@@ -1054,6 +1054,8 @@ def display_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
 def test_next_tile() :
     test_play_map = init_play_map(me = True, start = False)
     count = 0
+    # memo
+    secu = 0
     indicator = ['path_value', 'process_time', 'total_time', 'path_length', 'swing_turn', 
                  'total_turn', 'path_spread', 'spread_length_ratio']
     label = ['value', 'time', 'tot_time', 'length', 'turn', 'tot_turn', 'spread', 'sprd_lngth']
@@ -1070,8 +1072,12 @@ def test_next_tile() :
         spread, spread_length = display_path(temp)
         metric['path_spread'].append(spread)
         metric['spread_length_ratio'].append(spread_length)
+        # memo
+        if not temp['direction_path'] : secu += 1
+        
         count += 1
     for key in metric : print(f'{label[key]:7s} : ({round(stat.mean(metric[key]), 2):.2f}, {round(stat.pstdev(metric[key]), 2):.2f}), ({color[key]})')
+    print(f"secu : {secu}")
     
     import matplotlib.pyplot as plt
     turn = list(range(NUM['test']))
