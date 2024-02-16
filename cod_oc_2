@@ -1054,8 +1054,6 @@ def display_run_path(controller, cursor, fork_map, tile, cmd = '', r = '') :
 def test_next_tile() :
     test_play_map = init_play_map(me = True, start = False)
     count = 0
-    # memo
-    secu = 0
     indicator = ['path_value', 'process_time', 'total_time', 'path_length', 'swing_turn', 
                  'total_turn', 'path_spread', 'spread_length_ratio']
     label = ['value', 'time', 'tot_time', 'length', 'turn', 'tot_turn', 'spread', 'sprd_lngth']
@@ -1072,12 +1070,8 @@ def test_next_tile() :
         spread, spread_length = display_path(temp)
         metric['path_spread'].append(spread)
         metric['spread_length_ratio'].append(spread_length)
-        # memo
-        if not temp['direction_path'] : secu += 1
-        
         count += 1
     for key in metric : print(f'{label[key]:7s} : ({round(stat.mean(metric[key]), 2):.2f}, {round(stat.pstdev(metric[key]), 2):.2f}), ({color[key]})')
-    print(f"secu : {secu}")
     
     import matplotlib.pyplot as plt
     turn = list(range(NUM['test']))
