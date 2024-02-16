@@ -6,15 +6,6 @@ import copy
 from sklearn.model_selection import train_test_split
 from time import perf_counter
 
-# voir interaction entre play_map['path_extending'] et add_direction path. Un truc qui cloche
-
-# voir scatter et target j'y comprend rien
-"""
-LE PROBLEME EST LA ET NE SURVIENT PAS DANS LE CHECK :
-        if not blocking and play_map['sector_in'].get(index) :
-            blocking =  play_map['sector_in'].get(index) != current_sector
-"""
-    
 "MENU"
 
 DEBUG = True
@@ -435,9 +426,7 @@ def config_target(play_map, opp_play_map) :
     return round((0.5 * life_ratio + scatter_ratio) / 1.5 , 2)
 
 def config_heat_map(opp_play_map) :
-    # sm_mean = stat.fmean(opp_play_map['search_map'].values())
     sm_mean = 1 - opp_play_map['scatter']
-    # memo : distinguer 'scatter' 'probability' pourqu'on comprenne
     opp_heat_map = copy.deepcopy(opp_play_map['search_map'])
     coef = 1 / ( NUM['heat_map'] * 4)
     for repetition in range(NUM['heat_map']) :
@@ -517,7 +506,6 @@ def config_search_map(play_map) :
             play_map['search_area'] = [*temp_search_area, *non_tested]
             play_map['search_size'] = len(play_map['search_area'])
             play_map['scatter'] = 1 - probability
-            # memo : distinguer avec probabilité
             return play_map
         else :
             play_map['search_area'] = non_tested
@@ -782,7 +770,7 @@ def blocking(tile, play_map = None, index = None) :
     blocking = tile in MAP['island'] or off_side_tile(tile)
     if not blocking and play_map and play_map.get('last_tiles') :
         blocking = tile in play_map.get('last_tiles')  
-    if not blocking and play_map and play_map['main'] and play_map['me'] :
+    if not blocking and play_map and play_map['main'] :
         current_sector = tile_sector_converter(tile)
         if not blocking and play_map['sector_in'].get(index) :
             blocking =  play_map['sector_in'].get(index) != current_sector
