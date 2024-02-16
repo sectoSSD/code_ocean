@@ -85,6 +85,7 @@ def game_input(my_play_map, his_play_map) :
         input_['sonar_result'] = input()
         input_['his_order'] = input()
     else : input_ = create_input(my_play_map, his_play_map)
+    if my_play_map.get('position') != input_['position'] : raise Exception('my_play_map, position')
     his_play_map['life'] = input_['opp_life']
     his_play_map['order'] = input_['his_order']
     my_play_map.update({'position'         : input_['position'],
@@ -302,7 +303,7 @@ def update_play_map(play_map, opp_play_map) :
     if type(play_map['main'])  is not bool  : raise Exception(f"{play_map['main']} is not valid")
     if type(play_map['start']) is not bool  : raise Exception(f"{play_map['start']} is not valid")
     
-    if DEBUG :
+    if play_map.get('position') != None :
         play_map['position'] = add_tuple(play_map['position'], play_map['next_direction'])
     
     if not play_map['silence'] : 
@@ -313,7 +314,10 @@ def update_play_map(play_map, opp_play_map) :
         play_map['direction_path'].insert(0, tools['silence_tiles'])
         play_map['silence'] = False
     
-    play_map['next_direction'] = tuple()
+    if play_map.get('next_direction_path') :
+        play_map['next_direction_path'].pop(0)
+    if play_map.get('next_direction_path') :
+        play_map['next_direction'] = play_map['next_direction_path'][0]
     
     play_map.update({
     'direction_path_length'    : len(play_map['direction_path']),
@@ -328,7 +332,7 @@ def update_play_map(play_map, opp_play_map) :
     
     if play_map['me'] or DEBUG:
         if play_map['position'] not in play_map['last_tiles'] : play_map['last_tiles'].append(play_map['position'])
-    
+        
     return play_map
 
 " NEXT TILE"
@@ -336,21 +340,15 @@ def update_play_map(play_map, opp_play_map) :
 def next_tile(play_map) :
     try_, test_value, value = 0, -1, -1
     metrics, test = {}, {}
-    last_try = True
+    last_try = all([play_map['next_direction_path'], play_map['next_direction'], play_map['position']])
     open_1 = True
     while open_1 == True :
         
         open_2 = test_time(play_map, main = False)
         
         if not open_2 and last_try : 
-            position = play_map['position']
-            next_direction_path = play_map['next_direction_path'][1:]
-            next_direction = next_direction_path[0]
-            temp_play_map = config_temp_play_map(play_map, position, next_direction_path, next_direction)
-            # memo
-            # mettre ça dans update_play_map
-            # veuiller là bas qu'il y ai toujour un next_direction_path et un next_direction
-            # veuiller à ce que l'option ne s'ouvre pas sans les conditions ci _dessus (last_try = False)
+            temp_play_map = config_temp_play_map(play_map, play_map['position'], play_map['next_direction_path'], 
+            play_map['next_direction'])
             last_try = False
 
         while open_2 == True :
