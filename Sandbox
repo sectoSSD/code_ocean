@@ -6,15 +6,6 @@ import copy
 from sklearn.model_selection import train_test_split
 from time import perf_counter
 
-# voir interaction entre play_map['path_extending'] et add_direction path. Un truc qui cloche
-
-# voir scatter et target j'y comprend rien
-"""
-LE PROBLEME EST LA ET NE SURVIENT PAS DANS LE CHECK :
-        if not blocking and play_map['sector_in'].get(index) :
-            blocking =  play_map['sector_in'].get(index) != current_sector
-"""
-    
 "MENU"
 
 DEBUG = True
@@ -345,40 +336,51 @@ def update_play_map(play_map, opp_play_map) :
 def next_tile(play_map) :
     try_, test_value, value = 0, -1, -1
     metrics, test = {}, {}
+    last_try = True
     open_1 = True
     while open_1 == True :
+        
         open_2 = test_time(play_map, main = False)
+        
+        if not open_2 and last_try : 
+            position = play_map['position']
+            next_direction_path = play_map['next_direction_path'][1:]
+            next_direction = next_direction_path[0]
+            temp_play_map = config_temp_play_map(play_map, position, next_direction_path, next_direction)
+            # memo
+            # mettre ça dans update_play_map
+            # veuiller là bas qu'il y ai toujour un next_direction_path et un next_direction
+            # veuiller à ce que l'option ne s'ouvre pas sans les conditions ci _dessus (last_try = False)
+            last_try = False
+
         while open_2 == True :
             temp_play_map = random_path(play_map)
-            
             length_ratio = temp_play_map['next_direction_path_length'] / NUM['length']
             max_time = TIME['start'] if play_map['start'] == True else TIME['turn']
             time_ratio = (perf_counter() - i_time) / max_time
             open_2 = length_ratio < time_ratio and test_time(temp_play_map)
         
-        try :
-            temp_play_map = evaluate_dir_map(play_map, temp_play_map)
+        temp_play_map = evaluate_dir_map(play_map, temp_play_map)
+        
+        test_value, metrics, test = next_tile_recorder(test_value, try_, temp_play_map, metrics, test)
+    
+        if temp_play_map['next_direction_path_length'] > play_map['max_length_direction_path'] : 
+            play_map['max_length_direction_path'] = temp_play_map['next_direction_path_length'] 
             
-            test_value, metrics, test = next_tile_recorder(test_value, try_, temp_play_map, metrics, test)
-            
-            if temp_play_map['next_direction_path_length'] > play_map['max_length_direction_path'] : 
-                play_map['max_length_direction_path'] = temp_play_map['next_direction_path_length'] 
+        if temp_play_map['value'] > value :
+            value = temp_play_map['value']
+            play_map['next_direction_path'] = temp_play_map['next_direction_path']
+            play_map['next_direction']      = temp_play_map['next_direction']
+            ref_search_area                 = temp_play_map['search_area']
+        try_ += 1
+        open_1 = test_time(temp_play_map) or last_try
     
-            if temp_play_map['value'] > value :
-                value = temp_play_map['value']
-                play_map['next_direction_path'] = temp_play_map['next_direction_path']
-                play_map['next_direction']      = temp_play_map['next_direction']
-                ref_search_area                 = temp_play_map['search_area']
-            try_ += 1
-            open_1 = test_time(temp_play_map)
-    
-        except : break
-    
+    """
     if not play_map['start'] :
         play_map = next_tile_security(play_map)
-
+    """
     
-    if TEST['random_path'] : return metrics
+    if TEST['next_tile'] : return metrics
     if DSPL['search_map'] and play_map['me'] : display_search_map(test)
     if DSPL['path'] and play_map['me'] : display_path(test)
     
@@ -435,9 +437,7 @@ def config_target(play_map, opp_play_map) :
     return round((0.5 * life_ratio + scatter_ratio) / 1.5 , 2)
 
 def config_heat_map(opp_play_map) :
-    # sm_mean = stat.fmean(opp_play_map['search_map'].values())
     sm_mean = 1 - opp_play_map['scatter']
-    # memo : distinguer 'scatter' 'probability' pourqu'on comprenne
     opp_heat_map = copy.deepcopy(opp_play_map['search_map'])
     coef = 1 / ( NUM['heat_map'] * 4)
     for repetition in range(NUM['heat_map']) :
@@ -478,7 +478,7 @@ def hunting(temp_play_map, play_map) :
     hunting_value = []
     tile_path = update_path(temp_play_map['position'], temp_play_map['next_direction_path'])
     for tile in tile_path :
-        if play_map['opp_heat_map'].get(tile) : hunting_value.append(play_map['opp_heat_map'][tile])
+        if play_map['opp_heat_map'].get(tile) != None : hunting_value.append(play_map['opp_heat_map'][tile])
     return stat.mean(hunting_value)
 
 def next_tile_security(play_map) :
@@ -517,7 +517,6 @@ def config_search_map(play_map) :
             play_map['search_area'] = [*temp_search_area, *non_tested]
             play_map['search_size'] = len(play_map['search_area'])
             play_map['scatter'] = 1 - probability
-            # memo : distinguer avec probabilité
             return play_map
         else :
             play_map['search_area'] = non_tested
@@ -782,7 +781,7 @@ def blocking(tile, play_map = None, index = None) :
     blocking = tile in MAP['island'] or off_side_tile(tile)
     if not blocking and play_map and play_map.get('last_tiles') :
         blocking = tile in play_map.get('last_tiles')  
-    if not blocking and play_map and play_map['main'] and play_map['me'] :
+    if not blocking and play_map and play_map['main'] :
         current_sector = tile_sector_converter(tile)
         if not blocking and play_map['sector_in'].get(index) :
             blocking =  play_map['sector_in'].get(index) != current_sector
@@ -869,7 +868,7 @@ def create_input(my_play_map, his_play_map) :
     return input_
 
 def next_tile_recorder(test_value, try_, temp_play_map, metrics, test) :
-    if TEST['random_path'] or DSPL['search_map'] or DSPL['path'] :
+    if TEST['next_tile'] or DSPL['search_map'] or DSPL['path'] :
         if temp_play_map['value'] > test_value :
             test_value = temp_play_map['value']
             time_ = perf_counter() - i_time
@@ -974,7 +973,7 @@ def test_random_path() :
                 count += 1
             elif (x,y) in MAP['island'] : line.append('x')
             else : line.append('_')
-        print(line)
+        print(*line, sep = ' ')
 
 # debug
 
