@@ -85,6 +85,7 @@ def game_input(my_play_map, his_play_map) :
         input_['sonar_result'] = input()
         input_['his_order'] = input()
     else : input_ = create_input(my_play_map, his_play_map)
+    if my_play_map.get('position') != input_['position'] : raise Exception('my_play_map, position')
     his_play_map['life'] = input_['opp_life']
     his_play_map['order'] = input_['his_order']
     my_play_map.update({'position'         : input_['position'],
@@ -302,7 +303,7 @@ def update_play_map(play_map, opp_play_map) :
     if type(play_map['main'])  is not bool  : raise Exception(f"{play_map['main']} is not valid")
     if type(play_map['start']) is not bool  : raise Exception(f"{play_map['start']} is not valid")
     
-    if DEBUG :
+    if play_map.get('position') != None :
         play_map['position'] = add_tuple(play_map['position'], play_map['next_direction'])
     
     if not play_map['silence'] : 
@@ -313,7 +314,10 @@ def update_play_map(play_map, opp_play_map) :
         play_map['direction_path'].insert(0, tools['silence_tiles'])
         play_map['silence'] = False
     
-    play_map['next_direction'] = tuple()
+    if play_map.get('next_direction_path') :
+        play_map['next_direction_path'].pop(0)
+    if play_map.get('next_direction_path') :
+        play_map['next_direction'] = play_map['next_direction_path'][0]
     
     play_map.update({
     'direction_path_length'    : len(play_map['direction_path']),
@@ -328,7 +332,7 @@ def update_play_map(play_map, opp_play_map) :
     
     if play_map['me'] or DEBUG:
         if play_map['position'] not in play_map['last_tiles'] : play_map['last_tiles'].append(play_map['position'])
-    
+        
     return play_map
 
 " NEXT TILE"
@@ -336,38 +340,43 @@ def update_play_map(play_map, opp_play_map) :
 def next_tile(play_map) :
     try_, test_value, value = 0, -1, -1
     metrics, test = {}, {}
+    last_try = all([play_map['next_direction_path'], play_map['next_direction'], play_map['position']])
     open_1 = True
     while open_1 == True :
+        
         open_2 = test_time(play_map, main = False)
+        
+        if not open_2 and last_try : 
+            temp_play_map = config_temp_play_map(play_map, play_map['position'], play_map['next_direction_path'], 
+            play_map['next_direction'])
+            last_try = False
+
         while open_2 == True :
             temp_play_map = random_path(play_map)
-            
             length_ratio = temp_play_map['next_direction_path_length'] / NUM['length']
             max_time = TIME['start'] if play_map['start'] == True else TIME['turn']
             time_ratio = (perf_counter() - i_time) / max_time
             open_2 = length_ratio < time_ratio and test_time(temp_play_map)
         
-        try :
-            temp_play_map = evaluate_dir_map(play_map, temp_play_map)
+        temp_play_map = evaluate_dir_map(play_map, temp_play_map)
+        
+        test_value, metrics, test = next_tile_recorder(test_value, try_, temp_play_map, metrics, test)
+    
+        if temp_play_map['next_direction_path_length'] > play_map['max_length_direction_path'] : 
+            play_map['max_length_direction_path'] = temp_play_map['next_direction_path_length'] 
             
-            test_value, metrics, test = next_tile_recorder(test_value, try_, temp_play_map, metrics, test)
-            
-            if temp_play_map['next_direction_path_length'] > play_map['max_length_direction_path'] : 
-                play_map['max_length_direction_path'] = temp_play_map['next_direction_path_length'] 
+        if temp_play_map['value'] > value :
+            value = temp_play_map['value']
+            play_map['next_direction_path'] = temp_play_map['next_direction_path']
+            play_map['next_direction']      = temp_play_map['next_direction']
+            ref_search_area                 = temp_play_map['search_area']
+        try_ += 1
+        open_1 = test_time(temp_play_map) or last_try
     
-            if temp_play_map['value'] > value :
-                value = temp_play_map['value']
-                play_map['next_direction_path'] = temp_play_map['next_direction_path']
-                play_map['next_direction']      = temp_play_map['next_direction']
-                ref_search_area                 = temp_play_map['search_area']
-            try_ += 1
-            open_1 = test_time(temp_play_map)
-    
-        except : break
-    
+    """
     if not play_map['start'] :
         play_map = next_tile_security(play_map)
-
+    """
     
     if TEST['next_tile'] : return metrics
     if DSPL['search_map'] and play_map['me'] : display_search_map(test)
@@ -467,7 +476,7 @@ def hunting(temp_play_map, play_map) :
     hunting_value = []
     tile_path = update_path(temp_play_map['position'], temp_play_map['next_direction_path'])
     for tile in tile_path :
-        if play_map['opp_heat_map'].get(tile) : hunting_value.append(play_map['opp_heat_map'][tile])
+        if play_map['opp_heat_map'].get(tile) != None : hunting_value.append(play_map['opp_heat_map'][tile])
     return stat.mean(hunting_value)
 
 def next_tile_security(play_map) :
