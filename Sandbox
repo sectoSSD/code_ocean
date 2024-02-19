@@ -25,55 +25,6 @@ COOLDOWN = {'torpedo' : 3, 'sonar' : 4, 'silence' : 6, 'mine' : int(),}
 TIME = { 'start' : 0.65, 'start_limit' : 0.999, 'turn' : 0.025, 'turn_limit' : 0.049, 'heat_map' : 0.0055}
 FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12, 'torpedo_pwr' : 36, 'silence_pwr' : 36}
 NUM = {'length' : 10, 'test' : 60, 'laps' : 40, 'sampling' : 0.1, 'heat_map' : 14}  
-
-def ___(com) :
-    global lap, time, d_time, d_time_recorder
-    debug_time_list = ['his_start_tile', 'start_game_loop']
-    
-    if com == 'init_play_map' : timer()
-    elif com == 'start_game_loop' : 
-        timer()
-        lap = 0
-    elif com == 'i_take_decision' :
-        timer()
-    elif com == 'turn_lap' :
-       timer()
-       lap += 1   
-    
-    if DEBUG :
-        if com == 'init' :
-            d_timer()
-            d_time_recorder = dict()
-        elif com == 'init_play_map' : 
-            d_time_recorder.update({'init' : d_timer('stopwatch')})
-        elif com == 'my_start_tile' :
-            d_time_recorder.update({'init_play_map' : d_timer('stopwatch')})  
-        elif com == 'his_start_tile' :
-            timer()
-            d_time_recorder.update({'my_start_tile' : d_timer('stopwatch')})
-        elif com == 'start_game_loop' :
-            d_time_recorder.update({'his_start_tile' : d_timer('stopwatch')})
-            print('')
-            print(f"lap : {lap}")
-        elif com == 'he_plays' :
-            d_time_recorder.update({'create_input' : d_timer('stopwatch')})
-        elif com == 'i_take_decision' :
-            d_time_recorder.update({'he_plays' : d_timer('stopwatch')})
-        elif com == 'i_update_my_play_map' :
-            d_time_recorder.update({'i_take_decision' : d_timer('stopwatch')})
-        elif com == 'turn_lap' :
-            d_time_recorder.update({'i_update_my_play_map' : d_timer('stopwatch')})
-            if SHOW['time'] : 
-                print('')
-                print(f"lap : {lap}") 
-                for key,value in d_time_recorder.items() : 
-                    if value :print(f"{key} : {value}")
-                print('')
-            else : 
-                lap_time = sum([d_time_recorder[key] for key in d_time_recorder if key not in debug_time_list])
-                print(f"lap : {lap} ({lap_time})")
-        elif com == 'end' : 
-            print("end")
             
 # verifier que les com correspondent
         
@@ -270,6 +221,57 @@ def sonar_decision(my_play_map, his_play_map) :
 def silence_decision(play_map, opp_play_map) :
     play_map['silence'] = False if play_map['silence_cooldown'] != 0 else True
     return play_map
+
+" truc machin bidul"
+
+def ___(com) :
+    global lap, time, d_time, d_time_recorder
+    debug_time_list = ['his_start_tile', 'start_game_loop']
+    
+    if com == 'init_play_map' : timer()
+    elif com == 'start_game_loop' : 
+        timer()
+        lap = 0
+    elif com == 'i_take_decision' :
+        timer()
+    elif com == 'turn_lap' :
+       timer()
+       lap += 1   
+    
+    if DEBUG :
+        if com == 'init' :
+            d_timer()
+            d_time_recorder = dict()
+        elif com == 'init_play_map' : 
+            d_time_recorder.update({'init' : d_timer('stopwatch')})
+        elif com == 'my_start_tile' :
+            d_time_recorder.update({'init_play_map' : d_timer('stopwatch')})  
+        elif com == 'his_start_tile' :
+            timer()
+            d_time_recorder.update({'my_start_tile' : d_timer('stopwatch')})
+        elif com == 'start_game_loop' :
+            d_time_recorder.update({'his_start_tile' : d_timer('stopwatch')})
+            print('')
+            print(f"lap : {lap}")
+        elif com == 'he_plays' :
+            d_time_recorder.update({'create_input' : d_timer('stopwatch')})
+        elif com == 'i_take_decision' :
+            d_time_recorder.update({'he_plays' : d_timer('stopwatch')})
+        elif com == 'i_update_my_play_map' :
+            d_time_recorder.update({'i_take_decision' : d_timer('stopwatch')})
+        elif com == 'turn_lap' :
+            d_time_recorder.update({'i_update_my_play_map' : d_timer('stopwatch')})
+            if SHOW['time'] : 
+                print('')
+                print(f"lap : {lap}") 
+                for key,value in d_time_recorder.items() : 
+                    if value :print(f"{key} : {value}")
+                print('')
+            else : 
+                lap_time = sum([d_time_recorder[key] for key in d_time_recorder if key not in debug_time_list])
+                print(f"lap : {lap} ({lap_time})")
+        elif com == 'end' : 
+            print("end")
 
 " PLAY MAP"
 
