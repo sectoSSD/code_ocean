@@ -14,7 +14,7 @@ MESSAGE = True
 # instruction
 MSG = {'his_search_map' : True}
 OPT = {'sampling' : True, 'start' : True, 'game_loop' : True, 'one_path' : True}
-SHOW = {'island' : False, 'path' : False}
+SHOW = {'island' : False, 'path' : False, 'time' : False}
 TEST = {'heat_map' : False, 'next_tile' : False, 'random_path' : False}
 DSPL = {'check_search_map' : False, 'run_path' : False, 'path' : False , 'search_map' : False}
 DFLT = {'next_tile_security' : False, 'check_search_map' : False} # do not touch
@@ -29,61 +29,59 @@ NUM = {'length' : 10, 'test' : 60, 'laps' : 20, 'sampling' : 0.1, 'heat_map' : 1
 def ___(com) :
     global lap, time, d_time, d_time_recorder
     
-    if com == 'init_play_map' :
-        time = perf_counter()
+    debug_time_list = ['his_start_tile', 'start_game_loop']
+    
+    if com == 'init_play_map' : timer()
         
-    elif com == 'start_game_loop' :
-        time = perf_counter()
+    elif com == 'start_game_loop' : 
+        timer()
         lap = 0
     
+    elif com == 'i_take_decision' :
+        timer()
+    
     elif com == 'turn_lap' :
-       time = perf_counter()
+       timer()
        lap += 1   
     
     if DEBUG :
-        
         if com == 'init' :
-            d_time = perf_counter()
+            d_timer()
             d_time_recorder = dict()
         
         elif com == 'init_play_map' : 
-            d_time_recorder.update({'init' : perf_counter() - d_time})
-            d_time = perf_counter()
+            d_time_recorder.update({'init' : d_timer('stopwatch')})
            
         elif com == 'my_start_tile' :
-            d_time_recorder.update({'init_play_map' : perf_counter() - d_time})
-            d_time = perf_counter()
+            d_time_recorder.update({'init_play_map' : d_timer('stopwatch')})
             
         elif com == 'his_start_tile' :
-            d_time_recorder.update({'my_start_tile' : perf_counter() - d_time})
-            d_time = perf_counter()
+            timer()
+            d_time_recorder.update({'my_start_tile' : d_timer('stopwatch')})
             
         elif com == 'start_game_loop' :
-            d_time_recorder.update({'his_start_tile' : perf_counter() - d_time})
-            d_time = perf_counter()
+            d_time_recorder.update({'his_start_tile' : d_timer('stopwatch')})
             print(f"lap : {lap}")
         
         elif com == 'he_plays' :
-            d_time_recorder.update({'create_input' : perf_counter() - d_time})
-            d_time = perf_counter()
+            d_time_recorder.update({'create_input' : d_timer('stopwatch')})
         
         elif com == 'i_take_decision' :
-            d_time_recorder.update({'he_plays' : perf_counter() - d_time})
-            d_time = perf_counter()
+            d_time_recorder.update({'he_plays' : d_timer('stopwatch')})
         
         elif com == 'i_update_my_play_map' :
-            d_time_recorder.update({'i_take_decision' : perf_counter() - d_time})
-            d_time = perf_counter()
+            d_time_recorder.update({'i_take_decision' : d_timer('stopwatch')})
         
         elif com == 'turn_lap' :
-            d_time_recorder.update({'i_update_my_play_map' : perf_counter() - d_time})
-            d_time = perf_counter()
+            d_time_recorder.update({'i_update_my_play_map' : d_timer('stopwatch')})
+            if SHOW['time'] : print(f" lap : {lap} time : {d_time_recorder}")
+            else : 
+                lap_time = sum([d_time_recorder[key] for key in d_time_recorder if key not in debug_time_list])
+                print(f"lap : {lap} ({lap_time})")
             
         elif com == 'end' : 
-            print(f" end : {round(sum(d_time_recorder), 2)}")
+            print("end")
             
-       
-       
 # verifier que les com correspondent
         
 def main():
@@ -106,7 +104,6 @@ def main():
 def start() :
     
     ___('init_play_map')
-    i_timer()
     my_play_map = init_play_map(me = True, start = True)
     his_play_map = init_play_map(me = False, start = True)
     
@@ -191,7 +188,7 @@ def he_play(my_play_map, his_play_map) :
             elif  my_play_map['sonar_result'] == 'N' : his_play_map['sector_out'].update({lap - 1 : my_play_map['sonar']})
             
     his_play_map = update_play_map(his_play_map, my_play_map)
-    if DEBUG : print(f"his order : '{his_play_map['order']}' ({round(perf_counter()-i_time,3)})")
+    if DEBUG : print(f"his order : '{his_play_map['order']}' ({round(perf_counter()-time,3)})")
     return his_play_map
 
 def i_play(my_play_map, his_play_map) :
@@ -199,7 +196,6 @@ def i_play(my_play_map, his_play_map) :
     order = str()
     
     ___('i_take_decision')
-    i_timer()
     if surface_decision(my_play_map) : 
         order = 'SURFACE'
         sector = tile_sector_converter(my_play_map['position'])
@@ -224,7 +220,7 @@ def i_play(my_play_map, his_play_map) :
         # evaluer silence
         my_play_map = silence_decision(my_play_map, his_play_map)
         
-    if DEBUG : print(f"my order  : '{order}' ({round(perf_counter()-i_time,3)})")
+    if DEBUG : print(f"my order  : '{order}' ({round(perf_counter()-time,3)})")
     else : print(order)
     
     ___('i_update_my_play_map')
@@ -428,7 +424,7 @@ def next_tile(play_map) :
             temp_play_map = random_path(play_map)
             length_ratio = temp_play_map['next_direction_path_length'] / NUM['length']
             max_time = TIME['start'] if play_map['start'] == True else TIME['turn']
-            time_ratio = (perf_counter() - i_time) / max_time
+            time_ratio = (perf_counter() - time) / max_time
             open_2 = length_ratio < time_ratio and test_time(temp_play_map)
         
         temp_play_map = evaluate_dir_map(play_map, temp_play_map)
@@ -745,51 +741,36 @@ def config_global_var():
     return tools
 
 # time
-# memo 
 
-def init_timer() :
-    global gt_recorder, it_recorder, dt_recorder
-    gt_recorder = list()
-    it_recorder = list()
-    dt_recorder = list()
-    
-def g_timer(*command):
-    global g_time
-    if   'end'    in command : g_time = perf_counter() - g_time 
-    elif 'record' in command : print(round(perf_counter() - g_time),2)
-    elif 'print'  in command  and DEBUG : print(f"g_timer : {round(perf_counter() - g_time, 2)}")
-    else : g_time = perf_counter()
-
-def i_timer(*command):
-    global i_time
-    if   'end'    in command : i_time = perf_counter() - i_time 
-    elif 'record' in command : print(round(perf_counter() - i_time),2)
-    elif 'print'  in command and DEBUG : print(f"i_timer : {round(perf_counter() - i_time, 2)}")
-    else : i_time = perf_counter()
-
-def d_timer(*command) :
+def d_timer(com = None) :
     global d_time
-    if   'end'    in command : d_time = perf_counter() - i_time 
-    elif 'record' in command : print(round(perf_counter() - d_time),2)
-    elif 'print'  in command and DEBUG : print(f"d_timer : {round(perf_counter() - d_time, 2)}")
-    else : d_time = perf_counter()
+    if com == 'stopwatch' : 
+        stopwatch = round(perf_counter() - d_time,2)
+        d_time = perf_counter()
+        return stopwatch
+    else :
+        d_time = perf_counter()
+
+def timer(*com) :
+    global time
+    time = perf_counter()
 
 def test_time(play_map = None, main = None, start = None, heat_map = False) :
     if play_map and main == None : main = play_map['main'] 
     if play_map and start == None : play_map['start'] 
     
     if main and start :
-        test = perf_counter() - i_time < TIME['start_limit'] 
-        if not test : raise Exception(f'time_out : {perf_counter() - i_time}')
+        test = perf_counter() - time < TIME['start_limit'] 
+        if not test : raise Exception(f'time_out : {perf_counter() - time}')
     elif main and not start:
-        test = perf_counter() - i_time < TIME['turn_limit']
-        if not test : raise Exception(f'time_out : {perf_counter() - i_time}')
+        test = perf_counter() - time < TIME['turn_limit']
+        if not test : raise Exception(f'time_out : {perf_counter() - time}')
     elif not main and start :
-        test = perf_counter() - i_time < TIME['start'] 
+        test = perf_counter() - time < TIME['start'] 
     elif not main and not start and not heat_map :
-        test = perf_counter() - i_time < TIME['turn']
+        test = perf_counter() - time < TIME['turn']
     elif heat_map : 
-        test = perf_counter() - i_time < TIME['heat_map']
+        test = perf_counter() - time < TIME['heat_map']
     return test
     
 # direction_path
@@ -943,7 +924,7 @@ def next_tile_recorder(test_value, try_, temp_play_map, metrics, test) :
     if TEST['next_tile'] or DSPL['search_map'] or DSPL['path'] :
         if temp_play_map['value'] > test_value :
             test_value = temp_play_map['value']
-            time_ = perf_counter() - i_time
+            time_ = perf_counter() - time
             metrics = {'direction_path' : temp_play_map['direction_path'], 'path_value' : temp_play_map['value'], 
                        'process_time' : time_, 'path_length' :temp_play_map['direction_path_length'], 
                        'swing_turn' :  try_ }
@@ -952,7 +933,7 @@ def next_tile_recorder(test_value, try_, temp_play_map, metrics, test) :
                     'search_size' : temp_play_map['search_size'],
                     'scatter' : temp_play_map['scatter']}
                     # laisser scatter
-        metrics.update({'total_turn' : try_, 'total_time' : perf_counter() - i_time}) 
+        metrics.update({'total_turn' : try_, 'total_time' : perf_counter() - time}) 
     return test_value, metrics, test
 
 # check
@@ -1145,7 +1126,7 @@ def test_next_tile() :
     color = dict(zip(indicator, color))
     metric = {key : [] for key in indicator}
     while count != NUM['test'] :
-        i_timer()
+        timer()
         temp = next_tile(test_play_map) 
         for key in indicator : 
             try : metric[key].append(temp[key])
@@ -1201,9 +1182,9 @@ def test_heat_map() :
             for tile in non_tested : opp_play_map['search_map'][tile] = positive_rate
             opp_play_map['search_area'] = [*tested_and_positive, *non_tested]
             
-            i_timer()
+            timer()
             config_heat_map(opp_play_map)
-            time_test.append( (perf_counter() - i_time))
+            time_test.append( (perf_counter() - time))
             count.append(int( str(positive) + str(sample)))
             pos_rat.append(positive_rate)
             test_rat.append(tested / 225)
