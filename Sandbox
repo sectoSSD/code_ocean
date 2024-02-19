@@ -26,8 +26,69 @@ TIME = { 'start' : 0.65, 'start_limit' : 0.999, 'turn' : 0.025, 'turn_limit' : 0
 FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12, 'torpedo_pwr' : 36, 'silence_pwr' : 36}
 NUM = {'length' : 10, 'test' : 60, 'laps' : 20, 'sampling' : 0.1, 'heat_map' : 14}  
 
+def ___(com) :
+    global lap, time, d_time, d_time_recorder
+    
+    if com == 'init_play_map' :
+        time = perf_counter()
+        
+    elif com == 'start_game_loop' :
+        time = perf_counter()
+        lap = 0
+    
+    elif com == 'turn_lap' :
+       time = perf_counter()
+       lap += 1   
+    
+    if DEBUG :
+        
+        if com == 'init' :
+            d_time = perf_counter()
+            d_time_recorder = dict()
+        
+        elif com == 'init_play_map' : 
+            d_time_recorder.update({'init' : perf_counter() - d_time})
+            d_time = perf_counter()
+           
+        elif com == 'my_start_tile' :
+            d_time_recorder.update({'init_play_map' : perf_counter() - d_time})
+            d_time = perf_counter()
+            
+        elif com == 'his_start_tile' :
+            d_time_recorder.update({'my_start_tile' : perf_counter() - d_time})
+            d_time = perf_counter()
+            
+        elif com == 'start_game_loop' :
+            d_time_recorder.update({'his_start_tile' : perf_counter() - d_time})
+            d_time = perf_counter()
+            print(f"lap : {lap}")
+        
+        elif com == 'he_plays' :
+            d_time_recorder.update({'create_input' : perf_counter() - d_time})
+            d_time = perf_counter()
+        
+        elif com == 'i_take_decision' :
+            d_time_recorder.update({'he_plays' : perf_counter() - d_time})
+            d_time = perf_counter()
+        
+        elif com == 'i_update_my_play_map' :
+            d_time_recorder.update({'i_take_decision' : perf_counter() - d_time})
+            d_time = perf_counter()
+        
+        elif com == 'turn_lap' :
+            d_time_recorder.update({'i_update_my_play_map' : perf_counter() - d_time})
+            d_time = perf_counter()
+            
+        elif com == 'end' : 
+            print(f" end : {round(sum(d_time_recorder), 2)}")
+            
+       
+       
+# verifier que les com correspondent
+        
 def main():
-    g_timer()
+    
+    ___('init')
     config_global_var()
     check_search_map()
     config_map()
@@ -37,44 +98,50 @@ def main():
     if OPT['start'] : my_play_map, his_play_map = start()
     if OPT['game_loop'] and not DSPL['search_map'] and not DSPL['path'] :
         game_loop(my_play_map, his_play_map)
-    g_timer('print')
+    
+    ___('end')
 
 " STEP OF THE GAME "
 
 def start() :
+    
+    ___('init_play_map')
     i_timer()
     my_play_map = init_play_map(me = True, start = True)
     his_play_map = init_play_map(me = False, start = True)
+    
+    ___('my_start_tile')
     my_play_map = next_tile(my_play_map)
     start_tile = my_play_map['position']
-    if not DEBUG : print(*start_tile, sep = ' ')  
-    elif DSPL['path'] or DSPL['search_map'] : print(f'my_start_tile : {start_tile}')
-    else : 
-        i_timer()
-        print(f'my_start_tile : {start_tile}')
-        his_play_map = next_tile(his_play_map)
-        print(f"his_start tile : {his_play_map['position']}")
+    print(*start_tile, sep = ' ')  
+    
+    ___('his_start_tile')
+    if DEBUG :
+        if DSPL['path'] or DSPL['search_map'] : print(f'my_start_tile : {start_tile}')
+        else : 
+            his_play_map = next_tile(his_play_map)
+            print(f"his_start tile : {his_play_map['position']}")
     return my_play_map, his_play_map
 
 def game_loop(my_play_map, his_play_map) :
-    global lap
-    lap = 0
-    if DEBUG : print(f"lap : {lap}")
+    
+    ___('start_game_loop')
     my_play_map['start'] = False
     his_play_map['start'] = False
+    
     while True :
+        
         my_play_map, his_play_map = game_input(my_play_map, his_play_map)
         his_play_map = he_play(my_play_map, his_play_map)
         my_play_map = i_play(my_play_map, his_play_map)
+        
+        ___('turn_lap')
         test_time(my_play_map)
-        lap += 1
-        if DEBUG : print(f"lap : {lap}")
         if loop(my_play_map, his_play_map) : break
 
-" GAME LOOP MANAGER "
+" GAME LOOP "
 
 def game_input(my_play_map, his_play_map) :
-    i_timer()
     if not DEBUG :
         keys   = ['x', 'y', 'my_life', 'opp_life', 'torpedo_cooldown', 'sonar_cooldown', 'silence_cooldown', 'mine_cooldown']
         values = [int(i) for i in input().split()]
@@ -85,6 +152,7 @@ def game_input(my_play_map, his_play_map) :
         input_['sonar_result'] = input()
         input_['his_order'] = input()
     else : input_ = create_input(my_play_map, his_play_map)
+    
     if my_play_map.get('position') != input_['position'] : raise Exception('my_play_map, position')
     his_play_map['life'] = input_['opp_life']
     his_play_map['order'] = input_['his_order']
@@ -99,7 +167,8 @@ def game_input(my_play_map, his_play_map) :
     return my_play_map, his_play_map
 
 def he_play(my_play_map, his_play_map) :
-    i_timer()
+    
+    ___('he_plays')
     if his_play_map['order'] == 'NA' : return his_play_map
     message_order = [cursor.split() for cursor in his_play_map['order'].split('|')]
     for order_cursor in message_order :
@@ -128,6 +197,8 @@ def he_play(my_play_map, his_play_map) :
 def i_play(my_play_map, his_play_map) :
     global order
     order = str()
+    
+    ___('i_take_decision')
     i_timer()
     if surface_decision(my_play_map) : 
         order = 'SURFACE'
@@ -155,6 +226,8 @@ def i_play(my_play_map, his_play_map) :
         
     if DEBUG : print(f"my order  : '{order}' ({round(perf_counter()-i_time,3)})")
     else : print(order)
+    
+    ___('i_update_my_play_map')
     my_play_map = update_play_map(my_play_map, his_play_map)
     return  my_play_map
 
@@ -672,6 +745,7 @@ def config_global_var():
     return tools
 
 # time
+# memo 
 
 def init_timer() :
     global gt_recorder, it_recorder, dt_recorder
