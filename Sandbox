@@ -72,8 +72,13 @@ def game_loop(my_play_map, his_play_map) :
     
     while True :
         
+        ___('game_input')
         my_play_map, his_play_map = game_input(my_play_map, his_play_map)
+        
+        ___('he_plays')
         his_play_map = he_play(my_play_map, his_play_map)
+        
+        ___('i_play')
         my_play_map = i_play(my_play_map, his_play_map)
         
         ___('turn_lap')
@@ -83,6 +88,7 @@ def game_loop(my_play_map, his_play_map) :
 " GAME LOOP "
 
 def game_input(my_play_map, his_play_map) :
+    
     if not DEBUG :
         keys   = ['x', 'y', 'my_life', 'opp_life', 'torpedo_cooldown', 'sonar_cooldown', 'silence_cooldown', 'mine_cooldown']
         values = [int(i) for i in input().split()]
@@ -92,6 +98,7 @@ def game_input(my_play_map, his_play_map) :
         input_.pop('y')
         input_['sonar_result'] = input()
         input_['his_order'] = input()
+    
     else : input_ = create_input(my_play_map, his_play_map)
     
     if my_play_map.get('position') != input_['position'] : raise Exception('my_play_map, position')
@@ -109,7 +116,6 @@ def game_input(my_play_map, his_play_map) :
 
 def he_play(my_play_map, his_play_map) :
     
-    ___('he_plays')
     if his_play_map['order'] == 'NA' : return his_play_map
     message_order = [cursor.split() for cursor in his_play_map['order'].split('|')]
     for order_cursor in message_order :
@@ -130,7 +136,7 @@ def he_play(my_play_map, his_play_map) :
             # if Mine in order_cursor : ....
             if    my_play_map['sonar_result'] == 'Y' : his_play_map['sector_in'].update({lap - 1 : my_play_map['sonar']})
             elif  my_play_map['sonar_result'] == 'N' : his_play_map['sector_out'].update({lap - 1 : my_play_map['sonar']})
-            
+    
     his_play_map = update_play_map(his_play_map, my_play_map)
     if DEBUG : print(f"his order : '{his_play_map['order']}' ({round(perf_counter()-time,3)})")
     return his_play_map
@@ -139,7 +145,6 @@ def i_play(my_play_map, his_play_map) :
     global order
     order = str()
     
-    ___('i_take_decision')
     if surface_decision(my_play_map) : 
         order = 'SURFACE'
         sector = tile_sector_converter(my_play_map['position'])
@@ -225,42 +230,55 @@ def silence_decision(play_map, opp_play_map) :
 " truc machin bidul"
 
 def ___(com) :
-    global lap, time, d_time, d_time_recorder
-    debug_time_list = ['his_start_tile', 'start_game_loop']
+    global lap, time, d_time, d_time_recorder, lap_time
+
+    if com == 'init' :
+        d_timer()
+        d_time_recorder = dict()
+        
+    elif com == 'init_play_map' : 
+        timer()
+        d_time_recorder.update({'init' : d_timer('stopwatch')})
+        
+    elif com == 'my_start_tile' :
+        d_time_recorder.update({'init_play_map' : d_timer('stopwatch')})  
+        
+    elif com == 'his_start_tile' :
+        timer()
+        d_time_recorder.update({'my_start_tile' : d_timer('stopwatch')})
     
-    if com == 'init_play_map' : timer()
-    elif com == 'start_game_loop' : 
+    elif com == 'start_game_loop' :
         timer()
         lap = 0
-    elif com == 'i_take_decision' :
-        timer()
-    elif com == 'turn_lap' :
-       timer()
-       lap += 1   
+        lap_time = 0
+        d_time_recorder.update({'his_start_tile' : d_timer('stopwatch')})
+        if DEBUG : print('', f"lap : {lap}", sep = '\n')
     
-    if DEBUG :
-        if com == 'init' :
-            d_timer()
-            d_time_recorder = dict()
-        elif com == 'init_play_map' : 
-            d_time_recorder.update({'init' : d_timer('stopwatch')})
-        elif com == 'my_start_tile' :
-            d_time_recorder.update({'init_play_map' : d_timer('stopwatch')})  
-        elif com == 'his_start_tile' :
-            timer()
-            d_time_recorder.update({'my_start_tile' : d_timer('stopwatch')})
-        elif com == 'start_game_loop' :
-            d_time_recorder.update({'his_start_tile' : d_timer('stopwatch')})
-            print('')
-            print(f"lap : {lap}")
-        elif com == 'he_plays' :
-            d_time_recorder.update({'create_input' : d_timer('stopwatch')})
-        elif com == 'i_take_decision' :
-            d_time_recorder.update({'he_plays' : d_timer('stopwatch')})
-        elif com == 'i_update_my_play_map' :
-            d_time_recorder.update({'i_take_decision' : d_timer('stopwatch')})
-        elif com == 'turn_lap' :
-            d_time_recorder.update({'i_update_my_play_map' : d_timer('stopwatch')})
+    elif com == 'he_plays' :
+        d_time_recorder.update({'create_input' : d_timer('stopwatch')})
+        
+    elif com == 'i_play' :
+        timer()
+        inter_time = d_timer('stopwatch')
+        d_time_recorder = {'he_plays' : inter_time}
+        lap_time += inter_time
+        if lap_time > TIME['turn_limit'] : raise Exception(f"timeout : {d_time_recorder}")
+        
+    elif com == 'i_update_my_play_map' :
+        inter_time = d_timer('stopwatch')
+        d_time_recorder.update({'i_take_decision' : inter_time})
+        lap_time += inter_time
+        if lap_time > TIME['turn_limit'] : raise Exception(f"timeout : {d_time_recorder}")
+        
+    elif com == 'turn_lap' :
+        timer()
+        lap += 1  
+        inter_time = d_timer('stopwatch')
+        d_timer()
+        d_time_recorder.update({'i_update_my_play_map' : inter_time})
+        lap_time += inter_time
+        if lap_time > TIME['turn_limit'] : raise Exception(f"timeout : {d_time_recorder}")
+        if DEBUG :
             if SHOW['time'] : 
                 print('')
                 print(f"lap : {lap}") 
@@ -268,10 +286,10 @@ def ___(com) :
                     if value :print(f"{key} : {value}")
                 print('')
             else : 
-                lap_time = sum([d_time_recorder[key] for key in d_time_recorder if key not in debug_time_list])
-                print(f"lap : {lap} ({lap_time})")
-        elif com == 'end' : 
-            print("end")
+                print('', f"lap : {lap} ({round(lap_time, 3)})", sep = '\n')
+        lap_time = 0
+    elif com == 'end' : 
+        print("end")
 
 " PLAY MAP"
 
@@ -740,7 +758,7 @@ def config_global_var():
 def d_timer(com = None) :
     global d_time
     if com == 'stopwatch' : 
-        stopwatch = round(perf_counter() - d_time,2)
+        stopwatch = round(perf_counter() - d_time, 3)
         d_time = perf_counter()
         return stopwatch
     else :
