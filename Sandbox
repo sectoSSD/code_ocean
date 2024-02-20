@@ -17,7 +17,7 @@ OPT = {'sampling' : True, 'start' : True, 'game_loop' : True, 'one_path' : True}
 SHOW = {'island' : False, 'path' : False, 'time' : False}
 TEST = {'heat_map' : False, 'next_tile' : False, 'random_path' : False}
 DSPL = {'check_search_map' : False, 'run_path' : False, 'path' : False , 'search_map' : False}
-DFLT = {'next_tile_security' : False, 'check_search_map' : False} # do not touch
+DFLT = {'next_tile_security' : False, 'check_search_map' : False, 'torpedo' : False} # do not touch
 
 # constant
 MAP = {'torpedo' : 5, 'size' : 15}
@@ -45,6 +45,7 @@ def main():
 
 " STEP OF THE GAME "
 
+
 def start() :
     
     ___('init_play_map')
@@ -63,6 +64,7 @@ def start() :
             his_play_map = next_tile(his_play_map)
             print(f"his_start tile : {his_play_map['position']}")
     return my_play_map, his_play_map
+
 
 def game_loop(my_play_map, his_play_map) :
     
@@ -86,6 +88,7 @@ def game_loop(my_play_map, his_play_map) :
         if loop(my_play_map, his_play_map) : break
 
 " GAME LOOP "
+
 
 def game_input(my_play_map, his_play_map) :
     
@@ -114,6 +117,7 @@ def game_input(my_play_map, his_play_map) :
                         })
     return my_play_map, his_play_map
 
+
 def he_play(my_play_map, his_play_map) :
     
     if his_play_map['order'] == 'NA' : return his_play_map
@@ -140,6 +144,7 @@ def he_play(my_play_map, his_play_map) :
     his_play_map = update_play_map(his_play_map, my_play_map)
     if DEBUG : print(f"his order : '{his_play_map['order']}' ({round(perf_counter()-time,3)})")
     return his_play_map
+
 
 def i_play(my_play_map, his_play_map) :
     global order
@@ -176,12 +181,14 @@ def i_play(my_play_map, his_play_map) :
     my_play_map = update_play_map(my_play_map, his_play_map)
     return  my_play_map
 
+
 def surface_decision(play_map) :
     neighbor_tiles = update_path(play_map['position'], tools['manhattan'])
     surface = True
     for tile in neighbor_tiles :
         if not blocking(tile, play_map,  lap) : surface = False
     return surface
+
 
 def power_decision(my_play_map, his_play_map) :
     silence_power = False if my_play_map['search_size'] > FLOOR['silence_pwr'] else True
@@ -195,9 +202,11 @@ def power_decision(my_play_map, his_play_map) :
     else : power = ''
     return f"{power}"
 
+
 def torpedo_decision(my_play_map, his_play_map) :
     order = ''
     if his_play_map['search_size'] < FLOOR['torpedo'] and my_play_map['torpedo_cooldown'] == 0 :
+        DFLT['torpedo'] = True
         torpedo = torpedo_area(my_play_map['position'])
         torpedo_target = []
         for tile in his_play_map['search_area'] :
@@ -210,8 +219,10 @@ def torpedo_decision(my_play_map, his_play_map) :
             my_play_map['sector_tiles'].update({lap : shoot_tile})
     return order, my_play_map
 
+
 def mine_decision() :
     return ''
+
 
 def sonar_decision(my_play_map, his_play_map) :
     if my_play_map['sonar_cooldown'] > 0 : sector = 0
@@ -222,6 +233,7 @@ def sonar_decision(my_play_map, his_play_map) :
             sector = stat.mode(list(map(lambda tile : tile_sector_converter(tile), his_play_map['search_area'])))
     my_play_map.update({'sonar' : sector})
     return my_play_map
+
 
 def silence_decision(play_map, opp_play_map) :
     play_map['silence'] = False if play_map['silence_cooldown'] != 0 else True
@@ -888,9 +900,12 @@ def add_message(my_play_map, his_play_map) :
     if MESSAGE : 
         order = " | MSG "
         if MSG['his_search_map'] : order += f"SM{his_play_map['search_size']} "
-        if DFLT['next_tile_security']: 
+        if DFLT['next_tile_security'] : 
             order += "SECU "
             DFLT['next_tile_security'] = False
+        if DFLT['torpedo'] :
+            order += 'TORP '
+            DFLT['torpedo']= False
         if order == " | MSG " : order = ''
     else : order = ''
     return order
