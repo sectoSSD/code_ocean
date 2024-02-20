@@ -142,7 +142,7 @@ def he_play(my_play_map, his_play_map) :
             elif  my_play_map['sonar_result'] == 'N' : his_play_map['sector_out'].update({lap - 1 : my_play_map['sonar']})
     
     his_play_map = update_play_map(his_play_map, my_play_map)
-    if DEBUG : print(f"his order : '{his_play_map['order']}' ({round(perf_counter()-time,3)})")
+    if DEBUG : print(f"his order : '{his_play_map['order']}'")
     return his_play_map
 
 
@@ -174,7 +174,7 @@ def i_play(my_play_map, his_play_map) :
         # evaluer silence
         my_play_map = silence_decision(my_play_map, his_play_map)
         
-    if DEBUG : print(f"my order  : '{order}' ({round(perf_counter()-time,3)})")
+    if DEBUG : print(f"my order  : '{order}'")
     else : print(order)
     
     ___('i_update_my_play_map')
