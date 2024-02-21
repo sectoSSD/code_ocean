@@ -1,29 +1,34 @@
 import statistics as stat
+import numpy as np
 import random
 import math
 import copy
 
+
+
 from sklearn.model_selection import train_test_split
 from time import perf_counter
+from scipy.signal import convolve2d
+
 
 "MENU"
 
-DEBUG = False
+DEBUG = True
 MESSAGE = True
 
 # instruction
 MSG = {'his_search_map' : True}
 OPT = {'sampling' : True, 'start' : True, 'game_loop' : True, 'one_path' : True}
 SHOW = {'island' : False, 'path' : False, 'time' : False}
-TEST = {'heat_map' : False, 'next_tile' : False, 'random_path' : False}
+TEST = {'heat_map' : False, 'next_tile' : True, 'random_path' : False}
 DSPL = {'check_search_map' : False, 'run_path' : False, 'path' : False , 'search_map' : False}
 DFLT = {'next_tile_security' : False, 'check_search_map' : False, 'torpedo' : False} # do not touch
 
 # constant
 MAP = {'torpedo' : 5, 'size' : 15}
 COOLDOWN = {'torpedo' : 3, 'sonar' : 4, 'silence' : 6, 'mine' : int(),}
-TIME = { 'start' : 0.65, 'start_limit' : 0.999, 'turn' : 0.020, 'turn_limit' : 0.049, 'heat_map' : 0.0055, 'search_map' : 0.0040}
-FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12, 'torpedo_pwr' : 36, 'silence_pwr' : 42}
+TIME = { 'start' : 0.65, 'start_limit' : 0.999, 'turn' : 0.025, 'turn_limit' : 0.049, 'heat_map' : 0.0055} # delet heat_map
+FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12, 'torpedo_pwr' : 36, 'silence_pwr' : 36}
 NUM = {'length' : 10, 'test' : 60, 'laps' : 40, 'sampling' : 0.1, 'heat_map' : 14}  
             
 # verifier que les com correspondent
@@ -84,7 +89,6 @@ def game_loop(my_play_map, his_play_map) :
         my_play_map = i_play(my_play_map, his_play_map)
         
         ___('turn_lap')
-        test_time(my_play_map)
         if loop(my_play_map, his_play_map) : break
 
 " GAME LOOP "
@@ -113,8 +117,7 @@ def game_input(my_play_map, his_play_map) :
                         'sonar_cooldown'   : input_['sonar_cooldown'],
                         'silence_cooldown' : input_['silence_cooldown'],
                         'mine_cooldown'    : input_['mine_cooldown'],
-                        'sonar_result'     : input_['sonar_result']
-                        })
+                        'sonar_result'     : input_['sonar_result']})
     return my_play_map, his_play_map
 
 
@@ -155,7 +158,8 @@ def i_play(my_play_map, his_play_map) :
         sector = tile_sector_converter(my_play_map['position'])
         my_play_map = surface_play_map(my_play_map, sector)
     else :
-        # memo
+        # pas bien fait parce qu'on modifie direction path, position ... avant d'avoir appliquer l'order.
+        # move
         time_move = perf_counter()
         my_play_map = next_tile(my_play_map)
         order =  f"MOVE {dir_converter(*my_play_map['next_direction'])} "
@@ -163,7 +167,6 @@ def i_play(my_play_map, his_play_map) :
         # power
         order += power_decision(my_play_map, his_play_map)
         # torpedo
-        # memo
         time_torpedo = perf_counter()
         torpedo, my_play_map = torpedo_decision(my_play_map, his_play_map)
         if torpedo : order += torpedo
@@ -229,12 +232,11 @@ def mine_decision() :
 
 
 def sonar_decision(my_play_map, his_play_map) :
-    if my_play_map['sonar_cooldown'] > 0 : sector = 0
+    if my_play_map['sonar_cooldown'] > 0 or my_play_map['sector_size'] < 3: sector = 0
     else :
         if his_play_map['search_size'] > FLOOR['sonar'] :
-            sector = tile_sector_converter(random.choice(his_play_map['search_area']))
-        else :
-            sector = stat.mode(list(map(lambda tile : tile_sector_converter(tile), his_play_map['search_area'])))
+            sector = random.choice(his_play_map['sector_search'])
+        else : sector = his_play_map['sector_mod']
     my_play_map.update({'sonar' : sector})
     return my_play_map
 
@@ -264,19 +266,24 @@ def ___(com) :
         d_time_recorder.update({'my_start_tile' : d_timer('stopwatch')})
     
     elif com == 'start_game_loop' :
-        timer()
         lap = 0
-        lap_time = 0
         d_time_recorder.update({'his_start_tile' : d_timer('stopwatch')})
         if DEBUG : print('', f"lap : {lap}", sep = '\n')
     
+    elif com == 'game_input' : 
+        timer()
+        d_timer()
+        lap_time = 0
+        d_time_recorder.clear()
+        
     elif com == 'he_plays' :
-        d_time_recorder.update({'create_input' : d_timer('stopwatch')})
+        d_time_recorder = {'game_input' : d_timer('stopwatch')}
+        if lap_time > TIME['turn_limit'] : raise Exception(f"timeout : {d_time_recorder}")
         
     elif com == 'i_play' :
         timer()
         inter_time = d_timer('stopwatch')
-        d_time_recorder = {'he_plays' : inter_time}
+        d_time_recorder.update({'he_plays' : inter_time})
         lap_time += inter_time
         if lap_time > TIME['turn_limit'] : raise Exception(f"timeout : {d_time_recorder}")
         
@@ -289,10 +296,8 @@ def ___(com) :
         if lap_time > TIME['turn_limit'] : raise Exception(f"timeout : {d_time_recorder}")
         
     elif com == 'turn_lap' :
-        timer()
         lap += 1  
         inter_time = d_timer('stopwatch')
-        d_timer()
         d_time_recorder.update({'i_update_my_play_map' : inter_time})
         lap_time += inter_time
         if lap_time > TIME['turn_limit'] : raise Exception(f"timeout : {d_time_recorder}")
@@ -305,7 +310,6 @@ def ___(com) :
                 print('')
             else : 
                 print('', f"lap : {lap} ({round(lap_time, 3)})", sep = '\n')
-        lap_time = 0
     elif com == 'end' : 
         print("end")
 
@@ -332,6 +336,11 @@ def init_play_map(me, start) :
                 'search_map'                : {key : 1 for key in MAP['sea']},
                 'search_area'               : MAP['sea'],
                 'search_size'               : MAP['sea_size'],
+                
+                'sector_search'             : list(),
+                'sector_size'               : int(),
+                'sector_mod'                : int(),
+                
                 'scatter'                   : float(),
             
                 'life'                      : int(),
@@ -378,6 +387,10 @@ def config_temp_play_map(play_map, position, next_direction_path, next_direction
                         'search_map'                    : dict(),
                         'search_area'                   : list(),  # play_map['search_area'],
                         'search_size'                   : list(),  # play_map['search_size'],
+                        
+                        'sector_search'                 : list(),
+                        'sector_size'                   : int(),
+                        
                         'scatter'                       : float(),
                         'value'                         : int(),
                         
@@ -428,8 +441,12 @@ def update_play_map(play_map, opp_play_map) :
     
     if play_map['me'] or DEBUG :
         play_map['target'] = config_target(play_map, opp_play_map)
-        play_map['opp_heat_map'] = config_heat_map(opp_play_map)
-    
+        
+        # play_map['opp_heat_map'] = config_heat_map(opp_play_map)
+        search_map_array = dic_to_array(opp_play_map['search_map'])
+        heat_map_array = heat_map_1(search_map_array)
+        play_map['opp_heat_map'] = array_to_dic(heat_map_array)
+        
     if play_map['me'] or DEBUG:
         if play_map['position'] not in play_map['last_tiles'] : play_map['last_tiles'].append(play_map['position'])
         
@@ -534,6 +551,7 @@ def config_target(play_map, opp_play_map) :
     except ZeroDivisionError : scatter_ratio = 0
     return round((0.5 * life_ratio + scatter_ratio) / 1.5 , 2)
 
+"""
 def config_heat_map(opp_play_map) :
     sm_mean = 1 - opp_play_map['scatter']
     opp_heat_map = copy.deepcopy(opp_play_map['search_map'])
@@ -548,13 +566,33 @@ def config_heat_map(opp_play_map) :
             if repetition == NUM['heat_map'] - 1 or not test_time(heat_map = True)  : 
                 opp_heat_map[key] = round(opp_heat_map[key], 2)
                 return opp_heat_map 
+"""
+
+def dic_to_array(dic) :
+    array = np.array([[dic.get(x,y) if dic.get(x,y) != None else 0 for y in range(MAP['size'])] 
+                     for x in range(MAP['size'])])
+    return array.astype(np.float32)
+
+def heat_map_1(search_map) :
+    kernel = np.array([[0  , 0.8,   0], [0.8,   0, 0.8], [0  , 0.8,   0]])
+    for _ in range(14) :
+        search_map += convolve2d(search_map,kernel,mode='same', boundary='fill')
+    search_map = search_map / search_map.max()
+    search_map = np.round(search_map,3)
+    return search_map
+
+def array_to_dic(array) :
+    dictionnary = {(x,y) : array[x][y] for x,y in MAP['sea']}
+    return dictionnary
 
 def scatter(temp_play_map) :
     spread_list = []
-    sector_list = []
+    """
     for key in temp_play_map['search_map'] :
-        sector_list.append(tile_sector_converter(key))
         if temp_play_map['search_map'][key] == 1 :
+        """
+    for key in temp_play_map['search_area'] :
+        if temp_play_map['search_map'].get(key) == 1 :
             cursor_list = [add_tuple(key, tiles) for tiles in tools['euclidean']]
             count = 0
             for cursor in cursor_list :
@@ -562,7 +600,7 @@ def scatter(temp_play_map) :
                 except KeyError : continue
                 if temp_play_map['search_map'][cursor] == 1 : count += 1
                 spread_list.append(1 - (0.1 * count) if count >= 2 else 1)
-    sector_value = math.log(len(set(sector_list)) + 1, 10)
+    sector_value = math.log(temp_play_map['sector_size'] + 1, 10)
     length_value = math.sin(temp_play_map['next_direction_path_length'] * (math.pi / 2) / NUM['length'])
     try : spread_value = stat.mean(spread_list)
     except : spread_value = 0
@@ -594,12 +632,10 @@ def next_tile_security(play_map) :
 
 def config_search_map(play_map) :        
     positiv_result, tested_tile = 0, 0
-    # memo
-    time_controller = perf_counter()
     poll_rate = NUM['sampling']
     play_map['search_area'] = MAP['sea']
     play_map['search_size'] = MAP['sea_size']
-    temp_search_area = []
+    temp_search_area, temp_sector_search = [], []
     while True :
         
         non_tested, sample = sampling(play_map)
@@ -609,14 +645,26 @@ def config_search_map(play_map) :
             result = run_path(tile, play_map)
             play_map['search_map'][tile] = result
             positiv_result += result
-            if result : temp_search_area.append(tile)
+            if result : 
+                temp_search_area.append(tile)
+                temp_sector_search.append(tile_sector_converter(tile))
+                
         probability = round(positiv_result / tested_tile, 2)
         
-        time_controller = False if perf_counter() - time_controller > TIME['search_map'] else True
-        if probability > 0.9 - poll_rate or not non_tested or not time_controller:
-            for tile in non_tested : play_map['search_map'][tile] = probability
+        if probability > 0.9 - poll_rate or not non_tested :
+            for tile in non_tested : 
+                play_map['search_map'][tile] = probability
+                temp_sector_search.append(tile_sector_converter(tile))
+                
             play_map['search_area'] = [*temp_search_area, *non_tested]
             play_map['search_size'] = len(play_map['search_area'])
+            
+            if temp_sector_search and play_map['main'] : 
+                play_map['sector_mod'] = stat.mode(temp_sector_search)
+            temp_sector_search = list(set(temp_sector_search))
+            play_map['sector_search'] = temp_sector_search
+            play_map['sector_size'] = len(temp_sector_search)
+            
             play_map['scatter'] = 1 - probability
             return play_map
         else :
@@ -1220,7 +1268,11 @@ def test_heat_map() :
             opp_play_map['search_area'] = [*tested_and_positive, *non_tested]
             
             timer()
-            config_heat_map(opp_play_map)
+            # config_heat_map(opp_play_map)
+            search_map_array = dic_to_array(opp_play_map['search_map'])
+            heat_map_array = heat_map_1(search_map_array)
+            array_to_dic(heat_map_array)
+            
             time_test.append( (perf_counter() - time))
             count.append(int( str(positive) + str(sample)))
             pos_rat.append(positive_rate)
