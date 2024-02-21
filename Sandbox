@@ -326,6 +326,7 @@ def init_play_map(me, start) :
                 'search_map'                : {key : 1 for key in MAP['sea']},
                 'search_area'               : MAP['sea'],
                 'search_size'               : MAP['sea_size'],
+                'sector_search'             : int(),
                 'scatter'                   : float(),
             
                 'life'                      : int(),
@@ -372,6 +373,7 @@ def config_temp_play_map(play_map, position, next_direction_path, next_direction
                         'search_map'                    : dict(),
                         'search_area'                   : list(),  # play_map['search_area'],
                         'search_size'                   : list(),  # play_map['search_size'],
+                        'sector_search'                 : int(),
                         'scatter'                       : float(),
                         'value'                         : int(),
                         
@@ -591,7 +593,7 @@ def config_search_map(play_map) :
     poll_rate = NUM['sampling']
     play_map['search_area'] = MAP['sea']
     play_map['search_size'] = MAP['sea_size']
-    temp_search_area = []
+    temp_search_area, temp_sector_search = [], []
     while True :
         
         non_tested, sample = sampling(play_map)
@@ -601,13 +603,19 @@ def config_search_map(play_map) :
             result = run_path(tile, play_map)
             play_map['search_map'][tile] = result
             positiv_result += result
-            if result : temp_search_area.append(tile)
+            if result : 
+                temp_search_area.append(tile)
+                temp_sector_search.append(tile_sector_converter(tile))
+                
         probability = round(positiv_result / tested_tile, 2)
         
         if probability > 0.9 - poll_rate or not non_tested :
-            for tile in non_tested : play_map['search_map'][tile] = probability
+            for tile in non_tested : 
+                play_map['search_map'][tile] = probability
+                temp_sector_search.append(tile_sector_converter(tile))
             play_map['search_area'] = [*temp_search_area, *non_tested]
             play_map['search_size'] = len(play_map['search_area'])
+            play_map['sector_search'] = list(set(temp_sector_search))
             play_map['scatter'] = 1 - probability
             return play_map
         else :
