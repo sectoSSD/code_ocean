@@ -326,7 +326,8 @@ def init_play_map(me, start) :
                 'search_map'                : {key : 1 for key in MAP['sea']},
                 'search_area'               : MAP['sea'],
                 'search_size'               : MAP['sea_size'],
-                'sector_search'             : int(),
+                'sector_search'             : list(),
+                'sector_size'               : int(),
                 'scatter'                   : float(),
             
                 'life'                      : int(),
@@ -373,7 +374,8 @@ def config_temp_play_map(play_map, position, next_direction_path, next_direction
                         'search_map'                    : dict(),
                         'search_area'                   : list(),  # play_map['search_area'],
                         'search_size'                   : list(),  # play_map['search_size'],
-                        'sector_search'                 : int(),
+                        'sector_search'                 : list(),
+                        'sector_size'                   : int(),
                         'scatter'                       : float(),
                         'value'                         : int(),
                         
@@ -547,9 +549,7 @@ def config_heat_map(opp_play_map) :
 
 def scatter(temp_play_map) :
     spread_list = []
-    sector_list = []
     for key in temp_play_map['search_map'] :
-        sector_list.append(tile_sector_converter(key))
         if temp_play_map['search_map'][key] == 1 :
             cursor_list = [add_tuple(key, tiles) for tiles in tools['euclidean']]
             count = 0
@@ -558,7 +558,7 @@ def scatter(temp_play_map) :
                 except KeyError : continue
                 if temp_play_map['search_map'][cursor] == 1 : count += 1
                 spread_list.append(1 - (0.1 * count) if count >= 2 else 1)
-    sector_value = math.log(len(set(sector_list)) + 1, 10)
+    sector_value = math.log(temp_play_map['sector_size'] + 1, 10)
     length_value = math.sin(temp_play_map['next_direction_path_length'] * (math.pi / 2) / NUM['length'])
     try : spread_value = stat.mean(spread_list)
     except : spread_value = 0
@@ -613,9 +613,14 @@ def config_search_map(play_map) :
             for tile in non_tested : 
                 play_map['search_map'][tile] = probability
                 temp_sector_search.append(tile_sector_converter(tile))
+                
             play_map['search_area'] = [*temp_search_area, *non_tested]
             play_map['search_size'] = len(play_map['search_area'])
-            play_map['sector_search'] = list(set(temp_sector_search))
+            
+            temp_sector_search = list(set(temp_sector_search))
+            play_map['sector_search'] = temp_sector_search
+            play_map['sector_size'] = len(temp_sector_search)
+            
             play_map['scatter'] = 1 - probability
             return play_map
         else :
