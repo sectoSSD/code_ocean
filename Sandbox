@@ -1,10 +1,15 @@
 import statistics as stat
+import numpy as np
 import random
 import math
 import copy
 
+
+
 from sklearn.model_selection import train_test_split
 from time import perf_counter
+from scipy.signal import convolve2d
+
 
 "MENU"
 
@@ -14,15 +19,15 @@ MESSAGE = True
 # instruction
 MSG = {'his_search_map' : True}
 OPT = {'sampling' : True, 'start' : True, 'game_loop' : True, 'one_path' : True}
-SHOW = {'island' : False, 'path' : False, 'time' : True}
-TEST = {'heat_map' : False, 'next_tile' : False, 'random_path' : False}
+SHOW = {'island' : False, 'path' : False, 'time' : False}
+TEST = {'heat_map' : False, 'next_tile' : True, 'random_path' : False}
 DSPL = {'check_search_map' : False, 'run_path' : False, 'path' : False , 'search_map' : False}
 DFLT = {'next_tile_security' : False, 'check_search_map' : False, 'torpedo' : False} # do not touch
 
 # constant
 MAP = {'torpedo' : 5, 'size' : 15}
 COOLDOWN = {'torpedo' : 3, 'sonar' : 4, 'silence' : 6, 'mine' : int(),}
-TIME = { 'start' : 0.65, 'start_limit' : 0.999, 'turn' : 0.025, 'turn_limit' : 0.049, 'heat_map' : 0.0055}
+TIME = { 'start' : 0.65, 'start_limit' : 0.999, 'turn' : 0.025, 'turn_limit' : 0.049, 'heat_map' : 0.0055} # delet heat_map
 FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12, 'torpedo_pwr' : 36, 'silence_pwr' : 36}
 NUM = {'length' : 10, 'test' : 60, 'laps' : 40, 'sampling' : 0.1, 'heat_map' : 14}  
             
@@ -436,8 +441,12 @@ def update_play_map(play_map, opp_play_map) :
     
     if play_map['me'] or DEBUG :
         play_map['target'] = config_target(play_map, opp_play_map)
-        play_map['opp_heat_map'] = config_heat_map(opp_play_map)
-    
+        
+        # play_map['opp_heat_map'] = config_heat_map(opp_play_map)
+        search_map_array = dic_to_array(opp_play_map['search_map'])
+        heat_map_array = heat_map_1(search_map_array)
+        play_map['opp_heat_map'] = array_to_dic(heat_map_array)
+        
     if play_map['me'] or DEBUG:
         if play_map['position'] not in play_map['last_tiles'] : play_map['last_tiles'].append(play_map['position'])
         
@@ -542,6 +551,7 @@ def config_target(play_map, opp_play_map) :
     except ZeroDivisionError : scatter_ratio = 0
     return round((0.5 * life_ratio + scatter_ratio) / 1.5 , 2)
 
+"""
 def config_heat_map(opp_play_map) :
     sm_mean = 1 - opp_play_map['scatter']
     opp_heat_map = copy.deepcopy(opp_play_map['search_map'])
@@ -556,11 +566,33 @@ def config_heat_map(opp_play_map) :
             if repetition == NUM['heat_map'] - 1 or not test_time(heat_map = True)  : 
                 opp_heat_map[key] = round(opp_heat_map[key], 2)
                 return opp_heat_map 
+"""
+
+def dic_to_array(dic) :
+    array = np.array([[dic.get(x,y) if dic.get(x,y) != None else 0 for y in range(MAP['size'])] 
+                     for x in range(MAP['size'])])
+    return array.astype(np.float32)
+
+def heat_map_1(search_map) :
+    kernel = np.array([[0  , 0.8,   0], [0.8,   0, 0.8], [0  , 0.8,   0]])
+    for _ in range(14) :
+        search_map += convolve2d(search_map,kernel,mode='same', boundary='fill')
+    search_map = search_map / search_map.max()
+    search_map = np.round(search_map,3)
+    return search_map
+
+def array_to_dic(array) :
+    dictionnary = {(x,y) : array[x][y] for x,y in MAP['sea']}
+    return dictionnary
 
 def scatter(temp_play_map) :
     spread_list = []
+    """
     for key in temp_play_map['search_map'] :
         if temp_play_map['search_map'][key] == 1 :
+        """
+    for key in temp_play_map['search_area'] :
+        if temp_play_map['search_map'].get(key) == 1 :
             cursor_list = [add_tuple(key, tiles) for tiles in tools['euclidean']]
             count = 0
             for cursor in cursor_list :
@@ -1236,7 +1268,11 @@ def test_heat_map() :
             opp_play_map['search_area'] = [*tested_and_positive, *non_tested]
             
             timer()
-            config_heat_map(opp_play_map)
+            # config_heat_map(opp_play_map)
+            search_map_array = dic_to_array(opp_play_map['search_map'])
+            heat_map_array = heat_map_1(search_map_array)
+            array_to_dic(heat_map_array)
+            
             time_test.append( (perf_counter() - time))
             count.append(int( str(positive) + str(sample)))
             pos_rat.append(positive_rate)
