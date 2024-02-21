@@ -604,7 +604,7 @@ def config_search_map(play_map) :
             if result : temp_search_area.append(tile)
         probability = round(positiv_result / tested_tile, 2)
         
-        if probability > 1 - poll_rate or not non_tested :
+        if probability > 0.9 - poll_rate or not non_tested :
             for tile in non_tested : play_map['search_map'][tile] = probability
             play_map['search_area'] = [*temp_search_area, *non_tested]
             play_map['search_size'] = len(play_map['search_area'])
