@@ -8,7 +8,7 @@ from time import perf_counter
 
 "MENU"
 
-DEBUG = True
+DEBUG = False
 MESSAGE = True
 
 # instruction
@@ -22,8 +22,8 @@ DFLT = {'next_tile_security' : False, 'check_search_map' : False, 'torpedo' : Fa
 # constant
 MAP = {'torpedo' : 5, 'size' : 15}
 COOLDOWN = {'torpedo' : 3, 'sonar' : 4, 'silence' : 6, 'mine' : int(),}
-TIME = { 'start' : 0.65, 'start_limit' : 0.999, 'turn' : 0.025, 'turn_limit' : 0.049, 'heat_map' : 0.0055}
-FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12, 'torpedo_pwr' : 36, 'silence_pwr' : 36}
+TIME = { 'start' : 0.65, 'start_limit' : 0.999, 'turn' : 0.020, 'turn_limit' : 0.049, 'heat_map' : 0.0055, 'search_map' : 0.0040}
+FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12, 'torpedo_pwr' : 36, 'silence_pwr' : 42}
 NUM = {'length' : 10, 'test' : 60, 'laps' : 40, 'sampling' : 0.1, 'heat_map' : 14}  
             
 # verifier que les com correspondent
@@ -147,7 +147,7 @@ def he_play(my_play_map, his_play_map) :
 
 
 def i_play(my_play_map, his_play_map) :
-    global order
+    global order, time_move, time_torpedo
     order = str()
     
     if surface_decision(my_play_map) : 
@@ -155,15 +155,19 @@ def i_play(my_play_map, his_play_map) :
         sector = tile_sector_converter(my_play_map['position'])
         my_play_map = surface_play_map(my_play_map, sector)
     else :
-        # pas bien fait parce qu'on modifie direction path, position ... avant d'avoir appliquer l'order.
-        # move
+        # memo
+        time_move = perf_counter()
         my_play_map = next_tile(my_play_map)
         order =  f"MOVE {dir_converter(*my_play_map['next_direction'])} "
+        time_move = round(perf_counter() - time_move, 3)
         # power
         order += power_decision(my_play_map, his_play_map)
         # torpedo
+        # memo
+        time_torpedo = perf_counter()
         torpedo, my_play_map = torpedo_decision(my_play_map, his_play_map)
         if torpedo : order += torpedo
+        time_torpedo = round(perf_counter() - time_torpedo, 3)
         # mine
         order += mine_decision()
         # message
@@ -277,6 +281,8 @@ def ___(com) :
         if lap_time > TIME['turn_limit'] : raise Exception(f"timeout : {d_time_recorder}")
         
     elif com == 'i_update_my_play_map' :
+        if time_move : d_time_recorder.update({'time_move_opt' : time_move})
+        if time_torpedo : d_time_recorder.update({'time_torpedo_opt' : time_torpedo})
         inter_time = d_timer('stopwatch')
         d_time_recorder.update({'i_take_decision' : inter_time})
         lap_time += inter_time
@@ -588,6 +594,8 @@ def next_tile_security(play_map) :
 
 def config_search_map(play_map) :        
     positiv_result, tested_tile = 0, 0
+    # memo
+    time_controller = perf_counter()
     poll_rate = NUM['sampling']
     play_map['search_area'] = MAP['sea']
     play_map['search_size'] = MAP['sea_size']
@@ -604,7 +612,8 @@ def config_search_map(play_map) :
             if result : temp_search_area.append(tile)
         probability = round(positiv_result / tested_tile, 2)
         
-        if probability > 0.9 - poll_rate or not non_tested :
+        time_controller = False if perf_counter() - time_controller > TIME['search_map'] else True
+        if probability > 0.9 - poll_rate or not non_tested or not time_controller:
             for tile in non_tested : play_map['search_map'][tile] = probability
             play_map['search_area'] = [*temp_search_area, *non_tested]
             play_map['search_size'] = len(play_map['search_area'])
