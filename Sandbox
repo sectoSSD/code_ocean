@@ -332,6 +332,7 @@ def init_play_map(me, start) :
                 'sector_tiles'              : dict(),
             
                 'search_map'                : {key : 1 for key in MAP['sea']},
+                'arr_search_map'            : np.array([]),
                 'search_area'               : MAP['sea'],
                 'search_size'               : MAP['sea_size'],
                 
@@ -440,10 +441,12 @@ def update_play_map(play_map, opp_play_map) :
     if play_map['me'] or DEBUG :
         play_map['target'] = config_target(play_map, opp_play_map)
         
-        # play_map['opp_heat_map'] = config_heat_map(opp_play_map)
-        search_map_array = dic_to_array(opp_play_map['search_map'])
-        heat_map_array = heat_map_1(search_map_array)
+        """
+        heat_map_array = heat_map_1(play_map['arr_search_map'])
         play_map['opp_heat_map'] = array_to_dic(heat_map_array)
+        """
+        
+        play_map['opp_heat_map'] = heat_map_1(play_map['arr_search_map'])
         
     if play_map['me'] or DEBUG:
         if play_map['position'] not in play_map['last_tiles'] : play_map['last_tiles'].append(play_map['position'])
@@ -549,11 +552,6 @@ def config_target(play_map, opp_play_map) :
     except ZeroDivisionError : scatter_ratio = 0
     return round((0.5 * life_ratio + scatter_ratio) / 1.5 , 2)
 
-def dic_to_array(dic) :
-    array = np.array([[dic.get(x,y) if dic.get(x,y) != None else 0 for y in range(MAP['size'])] 
-                     for x in range(MAP['size'])])
-    return array.astype(np.float32)
-
 def heat_map_1(search_map) :
     kernel = np.array([[0  , 0.8,   0], [0.8,   0, 0.8], [0  , 0.8,   0]])
     for _ in range(14) :
@@ -562,16 +560,10 @@ def heat_map_1(search_map) :
     search_map = np.round(search_map,3)
     return search_map
 
-def array_to_dic(array) :
-    dictionnary = {(x,y) : array[x][y] for x,y in MAP['sea']}
-    return dictionnary
-
-
 def scatter(temp_play_map) :
 
     kernel = np.array([[0, 1, 0], [1, 10, 1], [0, 1, 0]])
-    search_map = dic_to_array(temp_play_map['search_map'])
-    res = convolve2d(search_map, kernel,mode='same', boundary='fill')
+    res = convolve2d(temp_play_map['arr_search_map'], kernel,mode='same', boundary='fill')
     spread_value = len(res[(res == 11 ) + (res == 12)])  / temp_play_map['next_direction_path_length']
     sector_value = math.log(temp_play_map['sector_size'] + 1, 10)
     length_value = math.sin(temp_play_map['next_direction_path_length'] * (math.pi / 2) / NUM['length'])
@@ -582,11 +574,8 @@ def scatter(temp_play_map) :
 def hunting(temp_play_map, play_map) :
     if play_map['me'] and (not play_map['opp_heat_map'] or not temp_play_map['next_direction_path']) : return 0
     if not play_map['me'] and DEBUG and (not play_map['opp_heat_map'] or not temp_play_map['next_direction_path']) : return 0
-    hunting_value = []
     tile_path = update_path(temp_play_map['position'], temp_play_map['next_direction_path'])
-    for tile in tile_path :
-        if play_map['opp_heat_map'].get(tile) != None : hunting_value.append(play_map['opp_heat_map'][tile])
-    return stat.mean(hunting_value)
+    return stat.mean(sum(play_map['opp_heat_map'][x][y] for x,y in tile_path))
 
 def next_tile_security(play_map) :
     global DFLT
@@ -636,6 +625,7 @@ def config_search_map(play_map) :
             play_map['sector_search'] = temp_sector_search
             play_map['sector_size'] = len(temp_sector_search)
             
+            play_map['arr_search_map'] = dic_to_array(play_map['search_map'])
             play_map['scatter'] = 1 - probability
             return play_map
         else :
@@ -827,6 +817,15 @@ def test_time(play_map = None, main = None, start = None, heat_map = False) :
     return test
     
 # direction_path
+
+def dic_to_array(dic) :
+    array = np.array([[dic.get(x,y) if dic.get(x,y) != None else 0 for y in range(MAP['size'])] 
+                     for x in range(MAP['size'])])
+    return array.astype(np.float32)
+
+def array_to_dic(array) :
+    dictionnary = {(x,y) : array[x][y] for x,y in MAP['sea']}
+    return dictionnary
 
 def add_tuple(tuple_1, tuple_2) :
     if type(tuple_1) is list and len(tuple_1) == 1 : tuple_1 = tuple_1[0]
