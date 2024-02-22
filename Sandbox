@@ -4,8 +4,6 @@ import random
 import math
 import copy
 
-
-
 from sklearn.model_selection import train_test_split
 from time import perf_counter
 from scipy.signal import convolve2d
@@ -551,23 +549,6 @@ def config_target(play_map, opp_play_map) :
     except ZeroDivisionError : scatter_ratio = 0
     return round((0.5 * life_ratio + scatter_ratio) / 1.5 , 2)
 
-"""
-def config_heat_map(opp_play_map) :
-    sm_mean = 1 - opp_play_map['scatter']
-    opp_heat_map = copy.deepcopy(opp_play_map['search_map'])
-    coef = 1 / ( NUM['heat_map'] * 4)
-    for repetition in range(NUM['heat_map']) :
-        for key in MAP['sea'] :
-            cursor_list = update_path(key, tools['manhattan'])
-            for cursor in cursor_list :
-                if opp_heat_map.get(cursor) : opp_heat_map[cursor] += opp_heat_map[key] * coef
-                else : opp_heat_map[key] += sm_mean * coef
-            opp_heat_map[key] += opp_play_map['search_map'][key] * coef
-            if repetition == NUM['heat_map'] - 1 or not test_time(heat_map = True)  : 
-                opp_heat_map[key] = round(opp_heat_map[key], 2)
-                return opp_heat_map 
-"""
-
 def dic_to_array(dic) :
     array = np.array([[dic.get(x,y) if dic.get(x,y) != None else 0 for y in range(MAP['size'])] 
                      for x in range(MAP['size'])])
@@ -585,25 +566,15 @@ def array_to_dic(array) :
     dictionnary = {(x,y) : array[x][y] for x,y in MAP['sea']}
     return dictionnary
 
+
 def scatter(temp_play_map) :
-    spread_list = []
-    """
-    for key in temp_play_map['search_map'] :
-        if temp_play_map['search_map'][key] == 1 :
-        """
-    for key in temp_play_map['search_area'] :
-        if temp_play_map['search_map'].get(key) == 1 :
-            cursor_list = [add_tuple(key, tiles) for tiles in tools['euclidean']]
-            count = 0
-            for cursor in cursor_list :
-                try : temp_play_map['search_map'][cursor]
-                except KeyError : continue
-                if temp_play_map['search_map'][cursor] == 1 : count += 1
-                spread_list.append(1 - (0.1 * count) if count >= 2 else 1)
+
+    kernel = np.array([[0, 1, 0], [1, 10, 1], [0, 1, 0]])
+    search_map = dic_to_array(temp_play_map['search_map'])
+    res = convolve2d(search_map, kernel,mode='same', boundary='fill')
+    spread_value = len(res[(res == 11 ) + (res == 12)])  / temp_play_map['next_direction_path_length']
     sector_value = math.log(temp_play_map['sector_size'] + 1, 10)
     length_value = math.sin(temp_play_map['next_direction_path_length'] * (math.pi / 2) / NUM['length'])
-    try : spread_value = stat.mean(spread_list)
-    except : spread_value = 0
     try : scatter_value = stat.mean(list(temp_play_map['search_map'].values()))
     except : scatter_value = 0
     return 0.30*spread_value + 0.30*sector_value + 0.15*length_value + 0.25*scatter_value
