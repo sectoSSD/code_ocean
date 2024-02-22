@@ -18,7 +18,7 @@ MESSAGE = True
 MSG = {'his_search_map' : True}
 OPT = {'sampling' : True, 'start' : True, 'game_loop' : True, 'one_path' : True}
 SHOW = {'island' : False, 'path' : False, 'time' : False}
-TEST = {'heat_map' : False, 'next_tile' : True, 'random_path' : False}
+TEST = {'heat_map' : False, 'next_tile' : False, 'random_path' : False}
 DSPL = {'check_search_map' : False, 'run_path' : False, 'path' : False , 'search_map' : False}
 DFLT = {'next_tile_security' : False, 'check_search_map' : False, 'torpedo' : False} # do not touch
 
@@ -355,7 +355,7 @@ def init_play_map(me, start) :
                          'sonar'                     : int(),
 
                          'target'                    : int(),
-                         'opp_heat_map'              : dict(),
+                         'opp_heat_map'              : np.zeros((MAP['size'],MAP['size'])),
                          'position'                  : tuple(),
                          'last_tiles'                : list(),
                 
@@ -564,7 +564,7 @@ def scatter(temp_play_map) :
 
     kernel = np.array([[0, 1, 0], [1, 10, 1], [0, 1, 0]])
     res = convolve2d(temp_play_map['arr_search_map'], kernel,mode='same', boundary='fill')
-    spread_value = len(res[(res == 11 ) + (res == 12)])  / temp_play_map['next_direction_path_length']
+    spread_value = len(res[(res == 11 ) + (res == 12)])  / (temp_play_map['next_direction_path_length'] + 1)
     sector_value = math.log(temp_play_map['sector_size'] + 1, 10)
     length_value = math.sin(temp_play_map['next_direction_path_length'] * (math.pi / 2) / NUM['length'])
     try : scatter_value = stat.mean(list(temp_play_map['search_map'].values()))
@@ -572,12 +572,16 @@ def scatter(temp_play_map) :
     return 0.30*spread_value + 0.30*sector_value + 0.15*length_value + 0.25*scatter_value
 
 def hunting(temp_play_map, play_map) :
-    if play_map['me'] and (not play_map['opp_heat_map'] or not temp_play_map['next_direction_path']) : return 0
-    if not play_map['me'] and DEBUG and (not play_map['opp_heat_map'] or not temp_play_map['next_direction_path']) : return 0
+    
+    if play_map.get('opp_heat_map').any() : return 0
     tile_path = update_path(temp_play_map['position'], temp_play_map['next_direction_path'])
-    return stat.mean(sum(play_map['opp_heat_map'][x][y] for x,y in tile_path))
+    try : hunting = np.mean([play_map['opp_heat_map'][x][y] for x,y in tile_path])
+    except IndexError : hunting = 0
+    # Problème : il y a souvent des path qui sorte de la carte
+    return hunting
 
 def next_tile_security(play_map) :
+    
     global DFLT
     if play_map['next_direction'] : return play_map
     else :
