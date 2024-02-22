@@ -25,7 +25,7 @@ DFLT = {'next_tile_security' : False, 'check_search_map' : False, 'torpedo' : Fa
 # constant
 MAP = {'torpedo' : 5, 'size' : 15}
 COOLDOWN = {'torpedo' : 3, 'sonar' : 4, 'silence' : 6, 'mine' : int(),}
-TIME = { 'start' : 0.65, 'start_limit' : 0.999, 'turn' : 0.025, 'turn_limit' : 0.049, 'heat_map' : 0.0055} # delet heat_map
+TIME = { 'start' : 0.65, 'start_limit' : 0.999, 'turn' : 0.020, 'turn_limit' : 0.049, 'heat_map' : 0.0055} # delet heat_map
 FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12, 'torpedo_pwr' : 36, 'silence_pwr' : 36}
 NUM = {'length' : 10, 'test' : 60, 'laps' : 40, 'sampling' : 0.1, 'heat_map' : 14}  
             
@@ -537,7 +537,6 @@ def random_path(play_map) :
     
     return config_temp_play_map(play_map, onset_tile, current_direction_path, first_direction)
 
-
 def evaluate_dir_map(play_map, temp_play_map) :
 
     temp_play_map = config_search_map(temp_play_map)
@@ -637,6 +636,16 @@ def config_search_map(play_map) :
             play_map['search_size'] = len(play_map['search_area'])
             poll_rate += NUM['sampling']
 
+def config_search_map_2(play_map) :
+    # construire le array en 3 dimension qui represente les 2d de l'espace le d du temps :
+    # a chaque tour 0 signifie libre et 1 signifie pas libre
+    # 1 changer MAP
+    # 2 ajouter une dimension à chaque tour
+    # 3 rajouter les sector in out et tiles
+    # gerer les silents paths
+    # ...
+    return
+    
 def sampling(play_map) :
     if play_map['start'] or play_map['search_size'] < FLOOR['sampling'] or not OPT['sampling'] :
         non_tested, sample = [], play_map['search_area']
@@ -744,17 +753,21 @@ def update_fork_map(fork, fork_map):
 def config_map() :
     global i_start, MAP
     tiles, island, sea = [], [], []
+    map_ = [] ###
     if not DEBUG :
         width, height, my_id = [int(i) for i in input().split()]
         if MAP['size'] != width or MAP['size'] != height : raise Exception('size != 15')
         size = MAP['size']
         for y in range(size):
+            map_.append([]) ###
             line = input()
             for x in range(size) :
                 tile = (x,y)
+                map_[y].append(tile) ###
                 tiles.append(tile)
                 if line[x] == 'x'  : island.append(tile)
                 else : sea.append(tile)
+        array = np.array([map_]) ###
     elif not DFLT['check_search_map'] and TEST['random_path'] :
         size = 7
         my_id = 0
@@ -772,10 +785,11 @@ def config_map() :
             num_island = random.choices([i for i in range(40)], weights)
             island = random.sample(tiles, *num_island)
         sea = [xy for xy in tiles if xy not in island]
+        array = np.array([[1 if (x,y) in island else 0 for x in range(size)] for y in range(size)]) ###
     if SHOW['island'] and DEBUG and not DFLT['check_search_map'] : print(f"island : {island}")
     i_start = True if not my_id else False
-    MAP.update({'tiles' : tiles, 'island' : island, 'sea' : sea, 'sea_size' : len(sea)})
-
+    MAP.update({'tiles' : tiles, 'island' : island, 'sea' : sea, 'sea_size' : len(sea), 'array' : array}) ###
+    
 " TOOLS"
 
 def config_global_var():
