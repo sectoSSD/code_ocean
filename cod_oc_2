@@ -16,6 +16,7 @@ MESSAGE = True
 
 # instruction
 MSG = {'his_search_map' : True}
+MOD = {'no_silence' : True}
 OPT = {'sampling' : True, 'start' : True, 'game_loop' : True, 'one_path' : True}
 SHOW = {'island' : False, 'path' : False, 'time' : False}
 TEST = {'heat_map' : False, 'next_tile' : False, 'random_path' : False}
@@ -131,7 +132,10 @@ def he_play(my_play_map, his_play_map) :
             if order_cursor[0] == 'MOVE' : 
                 his_play_map['next_direction'] = dir_converter(order_cursor[1])
             if order_cursor[0] == 'SILENCE' : 
-                his_play_map['silence'] = True
+                if not MOD['no_silence'] :
+                    his_play_map['silence'] = True
+                else : 
+                    his_play_map = degraded_mode_silence(his_play_map)
             if order_cursor[0] == 'SONAR' : 
                 sector = int(order_cursor[1])
                 his_play_map['sector_in'].update({lap : sector})
@@ -146,6 +150,15 @@ def he_play(my_play_map, his_play_map) :
     if DEBUG : print(f"his order : '{his_play_map['order']}'")
     return his_play_map
 
+def degraded_mode_silence(play_map) :
+    play_map.update({  'next_direction'  : [(0,0)],
+                       'direction_path'  : list(),
+                       'sector_in'       : dict(),
+                       'sector_out'      : dict(),
+                       'sector_tiles'    : dict()})
+    if play_map.get('last_tiles') :
+        play_map.update({'last_tiles' : list()})
+    return play_map
 
 def i_play(my_play_map, his_play_map) :
     global order, time_move, time_torpedo
@@ -155,6 +168,8 @@ def i_play(my_play_map, his_play_map) :
         order = 'SURFACE'
         sector = tile_sector_converter(my_play_map['position'])
         my_play_map = surface_play_map(my_play_map, sector)
+    elif silence_decision(my_play_map, his_play_map) :
+        my_play_map = silence_decision(my_play_map, his_play_map)
     else :
         # pas bien fait parce qu'on modifie direction path, position ... avant d'avoir appliquer l'order.
         # move
@@ -177,7 +192,7 @@ def i_play(my_play_map, his_play_map) :
         my_play_map = sonar_decision(my_play_map, his_play_map) 
         if my_play_map['sonar'] : order += f" | SONAR {my_play_map['sonar']}"
         # evaluer silence
-        my_play_map = silence_decision(my_play_map, his_play_map)
+
         
     if DEBUG : print(f"my order  : '{order}'")
     else : print(order)
@@ -238,10 +253,31 @@ def sonar_decision(my_play_map, his_play_map) :
     my_play_map.update({'sonar' : sector})
     return my_play_map
 
-
 def silence_decision(play_map, opp_play_map) :
-    play_map['silence'] = False if play_map['silence_cooldown'] != 0 else True
-    return play_map
+    if play_map['silence_cooldown'] == 0 and play_map['search_size'] < opp_play_map['search_size'] :
+        position = play_map['position']
+        direction_list = tools['manhattan']
+        length_list = [1,2,3,4]
+        random.shuffle(direction_list)
+        random.shuffle(length_list)
+        for direction in direction_list :
+            for length in length_list :
+                direction_path = direction * length
+                tile_path = tile_path_converter(position, direction_path)
+                valide = True 
+                for tile in tile_path :
+                    if blocking(tile) : 
+                        valide = False
+                        break
+                if valide :
+                    order = f"SILENCE {dir_converter(direction)} {length}"
+                    if DEBUG : 
+                        play_map['silence_cooldown'] = COOLDOWN['silence']
+                    if MOD['no_silence'] :
+                        play_map = degraded_mode_silence(play_map)
+                    else : play_map['silence'] = True
+                    return order, play_map
+    else : return False
 
 " truc machin bidul"
 
@@ -417,14 +453,14 @@ def update_play_map(play_map, opp_play_map) :
     
     if play_map.get('position') != None :
         play_map['position'] = add_tuple(play_map['position'], play_map['next_direction'])
-    
-    if not play_map['silence'] : 
+
+    if play_map['silence'] and not MOD['no_silence'] : 
+        play_map['direction_path'].insert(0, tools['silence_tiles'])
+        play_map['silence'] = False
+    else : 
         next_direction = play_map['next_direction']
         reversed_direction = reverse_direction(next_direction)
         play_map['direction_path'].insert(0, reversed_direction)
-    else :
-        play_map['direction_path'].insert(0, tools['silence_tiles'])
-        play_map['silence'] = False
     
     if play_map.get('next_direction_path') :
         play_map['next_direction_path'].pop(0)
@@ -574,7 +610,7 @@ def scatter(temp_play_map) :
 def hunting(temp_play_map, play_map) :
     
     if play_map.get('opp_heat_map').any() : return 0
-    tile_path = update_path(temp_play_map['position'], temp_play_map['next_direction_path'])
+    tile_path = tile_path_converter(temp_play_map['position'], temp_play_map['next_direction_path'])
     try : hunting = np.mean([play_map['opp_heat_map'][x][y] for x,y in tile_path])
     except IndexError : hunting = 0
     # Problème : il y a souvent des path qui sorte de la carte
@@ -853,6 +889,14 @@ def dir_converter(key) :
 def update_path(tile=(0,0), path = []) :    
     return [tile, *list(map(lambda xy : add_tuple(tile, xy), path))]
 
+def tile_path_converter(tile=(0,0), path = []) :   
+    tile_path = [tile]
+    current_tile = tile
+    for direction in path :
+        current_tile = add_tuple(current_tile, direction)
+        tile_path.append(current_tile)
+    return tile_path
+
 # direction path with map
 
 def extending(direction_path) :
@@ -962,11 +1006,12 @@ def create_input(my_play_map, his_play_map) :
     if i_start == True and lap == 0 : order = 'NA'
     elif surface_decision(his_play_map) or random.choices([True,False], [1,20])[0] :  
         order = f"SURFACE {tile_sector_converter(his_play_map['position'])}"
+    elif random.choices([True, False], [1,19])[0] :
+            order = 'SILENCE N 0'
     else :
         his_play_map = next_tile(his_play_map)
         order = f"MOVE {dir_converter(*his_play_map['next_direction'])} SILENCE"
-        his_play_map = silence_decision(his_play_map, my_play_map)
-        if his_play_map['silence'] : order += ' | SILENCE N 0'
+
     
     input_ = { 'position'         : my_play_map['position'],
                'my_life'          : random.randint(1,6) if not my_play_map['life'] else my_play_map['life'],
@@ -1075,7 +1120,7 @@ def test_random_path() :
         if len(test_play_map['next_direction_path']) == 10 : break 
     print(test_play_map['next_direction_path'])
     test_play_map['position'] = (1,1)
-    test_tile_path = update_path(test_play_map['position'], test_play_map['next_direction_path'])
+    test_tile_path = tile_path_converter(test_play_map['position'], test_play_map['next_direction_path'])
     
     for x in range(MAP['size']) :
         line = []
