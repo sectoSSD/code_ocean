@@ -117,8 +117,8 @@ def game_input(my_play_map, his_play_map) :
                         'silence_cooldown' : input_['silence_cooldown'],
                         'mine_cooldown'    : input_['mine_cooldown'],
                         'sonar_result'     : input_['sonar_result']})
+    my_play_map = check_last_tiles(my_play_map)
     return my_play_map, his_play_map
-
 
 def he_play(my_play_map, his_play_map) :
     
@@ -150,16 +150,30 @@ def he_play(my_play_map, his_play_map) :
     if DEBUG : print(f"his order : '{his_play_map['order']}'")
     return his_play_map
 
-def degraded_mode_silence(play_map) :
-    play_map.update({  'next_direction'  : [(0,0)],
+def degraded_mode_silence(play_map, next_direction = [(0,0)]) :
+    play_map.update({  'next_direction'  : next_direction,
                        'direction_path'  : list(),
                        'sector_in'       : dict(),
                        'sector_out'      : dict(),
                        'sector_tiles'    : dict()})
-    if play_map.get('last_tiles') :
-        play_map.update({'last_tiles' : list()})
     return play_map
 
+kernel = [[0,0,0,0,1,0,0,0,0],
+          [0,0,0,0,1,0,0,0,0],
+          [0,0,0,0,1,0,0,0,0],
+          [0,0,0,0,1,0,0,0,0],
+          [1,1,1,1,1,1,1,1,1],
+          [0,0,0,0,1,0,0,0,0],
+          [0,0,0,0,1,0,0,0,0],
+          [0,0,0,0,1,0,0,0,0],
+          [0,0,0,0,1,0,0,0,0]]
+
+new_search_map = convolve2d(search_map,kernel,mode='same', boundary='fill')
+new_search_map[new_search_map != 0] = 1
+new_search_map
+
+# il rest le problème des obstacles qui ne sont pas géré (on ferra sans sinon ...)
+# relger heat_map aussi (c'est plus facile)
 def i_play(my_play_map, his_play_map) :
     global order, time_move, time_torpedo
     order = str()
@@ -169,7 +183,7 @@ def i_play(my_play_map, his_play_map) :
         sector = tile_sector_converter(my_play_map['position'])
         my_play_map = surface_play_map(my_play_map, sector)
     elif silence_decision(my_play_map, his_play_map) :
-        my_play_map = silence_decision(my_play_map, his_play_map)
+        order, my_play_map = silence_decision(my_play_map, his_play_map)
     else :
         # pas bien fait parce qu'on modifie direction path, position ... avant d'avoir appliquer l'order.
         # move
@@ -212,7 +226,7 @@ def surface_decision(play_map) :
 
 def power_decision(my_play_map, his_play_map) :
     silence_power = False if my_play_map['search_size'] > FLOOR['silence_pwr'] else True
-    torpedo_power = False if my_play_map['search_size'] > FLOOR['torpedo_pwr'] else True
+    torpedo_power = False if his_play_map['search_size'] > FLOOR['torpedo_pwr'] else True
     if silence_power and my_play_map['silence_cooldown'] > 0 : power = 'SILENCE'
     elif torpedo_power and my_play_map['torpedo_cooldown'] > 0 : power = 'TORPEDO'
     elif my_play_map['sonar_cooldown']   > 0 : power = 'SONAR'
@@ -228,9 +242,11 @@ def torpedo_decision(my_play_map, his_play_map) :
     if his_play_map['search_size'] < FLOOR['torpedo'] and my_play_map['torpedo_cooldown'] == 0 :
         DFLT['torpedo'] = True
         torpedo = torpedo_area(my_play_map['position'])
+        my_area = update_path(my_play_map['position'], tools['euclidean'])
         torpedo_target = []
         for tile in his_play_map['search_area'] :
-            if tile in torpedo : torpedo_target.append(tile)
+            if tile in torpedo and tile not in my_area : 
+                torpedo_target.append(tile)
         if torpedo_target :
             shoot_tile = random.choice(torpedo_target)
             ttx, tty = shoot_tile
@@ -266,7 +282,7 @@ def silence_decision(play_map, opp_play_map) :
                 tile_path = tile_path_converter(position, direction_path)
                 valide = True 
                 for tile in tile_path :
-                    if blocking(tile) : 
+                    if blocking(tile, play_map) : 
                         valide = False
                         break
                 if valide :
@@ -274,7 +290,10 @@ def silence_decision(play_map, opp_play_map) :
                     if DEBUG : 
                         play_map['silence_cooldown'] = COOLDOWN['silence']
                     if MOD['no_silence'] :
-                        play_map = degraded_mode_silence(play_map)
+                        next_direction = multiply_tuple(length, direction)
+                        play_map = degraded_mode_silence(play_map, next_direction)
+                        if play_map.get('last_tiles') != None : 
+                            play_map['last_tiles'].append(tile_path)
                     else : play_map['silence'] = True
                     return order, play_map
     else : return False
@@ -483,10 +502,14 @@ def update_play_map(play_map, opp_play_map) :
         """
         
         play_map['opp_heat_map'] = heat_map_1(play_map['arr_search_map'])
-        
-    if play_map['me'] or DEBUG:
-        if play_map['position'] not in play_map['last_tiles'] : play_map['last_tiles'].append(play_map['position'])
-        
+     
+    play_map = check_last_tiles(play_map)
+    return play_map
+
+def check_last_tiles(play_map) :
+    if play_map.get('last_tiles') != None :
+        if play_map['position'] not in play_map['last_tiles'] : 
+            play_map['last_tiles'].append(play_map['position'])
     return play_map
 
 " NEXT TILE"
@@ -871,6 +894,11 @@ def add_tuple(tuple_1, tuple_2) :
     if type(tuple_1) is list and len(tuple_1) == 1 : tuple_1 = tuple_1[0]
     if type(tuple_2) is list and len(tuple_2) == 1 : tuple_2 = tuple_2[0] 
     return tuple_1[0] + tuple_2[0], tuple_1[1] + tuple_2[1]
+
+def multiply_tuple(coef, direction) :
+    if type(direction) is list and len(direction) == 1 :
+        direction = direction[0]
+    return [(direction[0] * coef , direction[1] * coef)]
 
 def reverse_direction(direction) :
     if type(direction) is list and len(direction) == 1 :
