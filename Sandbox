@@ -167,7 +167,7 @@ def i_play(my_play_map, his_play_map) :
     if surface_decision(my_play_map) : 
         order = 'SURFACE'
         sector = tile_sector_converter(my_play_map['position'])
-        order, my_play_map = surface_play_map(my_play_map, sector)
+        my_play_map = surface_play_map(my_play_map, sector)
     elif silence_decision(my_play_map, his_play_map) :
         my_play_map = silence_decision(my_play_map, his_play_map)
     else :
@@ -253,26 +253,17 @@ def sonar_decision(my_play_map, his_play_map) :
     my_play_map.update({'sonar' : sector})
     return my_play_map
 
-
-position = (0,0)
-direction = random.choice(tools['manhattan'])
-length = random.randint(0,4)
-direction = multiply_tupple(length, direction)
-new_position = add_tuple(position, direction)
-new_position
-
 def silence_decision(play_map, opp_play_map) :
-
     if play_map['silence_cooldown'] == 0 and play_map['search_size'] < opp_play_map['search_size'] :
         position = play_map['position']
         direction_list = tools['manhattan']
-        random.shuffle(direction_list)
         length_list = [1,2,3,4]
+        random.shuffle(direction_list)
+        random.shuffle(length_list)
         for direction in direction_list :
-            random.shuffle(length_list)
             for length in length_list :
                 direction_path = direction * length
-                tile_path = update_path(position, direction_path)
+                tile_path = tile_path_converter(position, direction_path)
                 valide = True 
                 for tile in tile_path :
                     if blocking(tile) : 
@@ -280,12 +271,13 @@ def silence_decision(play_map, opp_play_map) :
                         break
                 if valide :
                     order = f"SILENCE {dir_converter(direction)} {length}"
+                    if DEBUG : 
+                        play_map['silence_cooldown'] = COOLDOWN['silence']
                     if MOD['no_silence'] :
-                        play_map = play_map = degraded_mode_silence(play_map)
+                        play_map = degraded_mode_silence(play_map)
                     else : play_map['silence'] = True
                     return order, play_map
     else : return False
-ddd
 
 " truc machin bidul"
 
@@ -618,7 +610,7 @@ def scatter(temp_play_map) :
 def hunting(temp_play_map, play_map) :
     
     if play_map.get('opp_heat_map').any() : return 0
-    tile_path = update_path(temp_play_map['position'], temp_play_map['next_direction_path'])
+    tile_path = tile_path_converter(temp_play_map['position'], temp_play_map['next_direction_path'])
     try : hunting = np.mean([play_map['opp_heat_map'][x][y] for x,y in tile_path])
     except IndexError : hunting = 0
     # Problème : il y a souvent des path qui sorte de la carte
@@ -897,6 +889,14 @@ def dir_converter(key) :
 def update_path(tile=(0,0), path = []) :    
     return [tile, *list(map(lambda xy : add_tuple(tile, xy), path))]
 
+def tile_path_converter(tile=(0,0), path = []) :   
+    tile_path = [tile]
+    current_tile = tile
+    for direction in path :
+        current_tile = add_tuple(current_tile, direction)
+        tile_path.append(current_tile)
+    return tile_path
+
 # direction path with map
 
 def extending(direction_path) :
@@ -1006,11 +1006,12 @@ def create_input(my_play_map, his_play_map) :
     if i_start == True and lap == 0 : order = 'NA'
     elif surface_decision(his_play_map) or random.choices([True,False], [1,20])[0] :  
         order = f"SURFACE {tile_sector_converter(his_play_map['position'])}"
+    elif random.choices([True, False], [1,19])[0] :
+            order = 'SILENCE N 0'
     else :
         his_play_map = next_tile(his_play_map)
         order = f"MOVE {dir_converter(*his_play_map['next_direction'])} SILENCE"
-        his_play_map = silence_decision(his_play_map, my_play_map)
-        if his_play_map['silence'] : order += ' | SILENCE N 0'
+
     
     input_ = { 'position'         : my_play_map['position'],
                'my_life'          : random.randint(1,6) if not my_play_map['life'] else my_play_map['life'],
@@ -1119,7 +1120,7 @@ def test_random_path() :
         if len(test_play_map['next_direction_path']) == 10 : break 
     print(test_play_map['next_direction_path'])
     test_play_map['position'] = (1,1)
-    test_tile_path = update_path(test_play_map['position'], test_play_map['next_direction_path'])
+    test_tile_path = tile_path_converter(test_play_map['position'], test_play_map['next_direction_path'])
     
     for x in range(MAP['size']) :
         line = []
