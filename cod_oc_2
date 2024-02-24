@@ -27,7 +27,7 @@ DFLT = {'next_tile_security' : False, 'check_search_map' : False, 'torpedo' : Fa
 MAP = {'torpedo' : 5, 'size' : 15}
 COOLDOWN = {'torpedo' : 3, 'sonar' : 4, 'silence' : 6, 'mine' : int(),}
 TIME = { 'start' : 0.65, 'start_limit' : 0.999, 'turn' : 0.025, 'turn_limit' : 0.049, 'heat_map' : 0.0055} # delet heat_map
-FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12, 'torpedo_pwr' : 36, 'silence_pwr' : 36}
+FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12, 'torpedo_pwr' : 36, 'silence_pwr' : 36, 'silence-tiles' : 36}
 NUM = {'length' : 10, 'test' : 60, 'laps' : 40, 'sampling' : 0.1, 'heat_map' : 14}  
             
 # verifier que les com correspondent
@@ -151,28 +151,33 @@ def he_play(my_play_map, his_play_map) :
     return his_play_map
 
 def degraded_mode_silence(play_map, next_direction = [(0,0)]) :
+    
+    kernel = [[0,0,0,0,1,0,0,0,0],
+              [0,0,0,0,1,0,0,0,0],
+              [0,0,0,0,1,0,0,0,0],
+              [0,0,0,0,1,0,0,0,0],
+              [1,1,1,1,1,1,1,1,1],
+              [0,0,0,0,1,0,0,0,0],
+              [0,0,0,0,1,0,0,0,0],
+              [0,0,0,0,1,0,0,0,0],
+              [0,0,0,0,1,0,0,0,0]]    
+    
+    
+    new_arr_search_map = convolve2d(play_map['arr_search_map'],kernel,mode='same', boundary='fill')
+    
+    tiles = ( np.argwhere(new_arr_search_map != 0).tolist() 
+              if len(np.argwhere(new_arr_search_map < 1).tolist()) < FLOOR['silence-tiles'] 
+              else 0 )
+    
+    tiles = list(map(lambda xy : tuple(xy), tiles))
+    
     play_map.update({  'next_direction'  : next_direction,
                        'direction_path'  : list(),
                        'sector_in'       : dict(),
                        'sector_out'      : dict(),
-                       'sector_tiles'    : dict()})
+                       'sector_tiles'    : {lap : tiles}  })
     return play_map
 
-kernel = [[0,0,0,0,1,0,0,0,0],
-          [0,0,0,0,1,0,0,0,0],
-          [0,0,0,0,1,0,0,0,0],
-          [0,0,0,0,1,0,0,0,0],
-          [1,1,1,1,1,1,1,1,1],
-          [0,0,0,0,1,0,0,0,0],
-          [0,0,0,0,1,0,0,0,0],
-          [0,0,0,0,1,0,0,0,0],
-          [0,0,0,0,1,0,0,0,0]]
-
-new_search_map = convolve2d(search_map,kernel,mode='same', boundary='fill')
-new_search_map[new_search_map != 0] = 1
-new_search_map
-
-# il rest le problème des obstacles qui ne sont pas géré (on ferra sans sinon ...)
 # relger heat_map aussi (c'est plus facile)
 def i_play(my_play_map, his_play_map) :
     global order, time_move, time_torpedo
@@ -240,19 +245,17 @@ def power_decision(my_play_map, his_play_map) :
 def torpedo_decision(my_play_map, his_play_map) :
     order = ''
     if his_play_map['search_size'] < FLOOR['torpedo'] and my_play_map['torpedo_cooldown'] == 0 :
+        
         DFLT['torpedo'] = True
         torpedo = torpedo_area(my_play_map['position'])
         my_area = update_path(my_play_map['position'], tools['euclidean'])
-        torpedo_target = []
         for tile in his_play_map['search_area'] :
             if tile in torpedo and tile not in my_area : 
-                torpedo_target.append(tile)
-        if torpedo_target :
-            shoot_tile = random.choice(torpedo_target)
-            ttx, tty = shoot_tile
-            if type(ttx) is not int or type(tty) is not int : raise Exception("i_play()/torpedo_target : not int")
-            order = f" | TORPEDO {ttx} {ttx}"
-            my_play_map['sector_tiles'].update({lap : shoot_tile})
+                ttx, tty = tile
+                if type(ttx) is not int or type(tty) is not int : raise Exception("i_play()/torpedo_target : not int")
+                order = f" | TORPEDO {ttx} {ttx}"
+                my_play_map['sector_tiles'].update({lap : torpedo})
+                break
     return order, my_play_map
 
 
@@ -270,7 +273,8 @@ def sonar_decision(my_play_map, his_play_map) :
     return my_play_map
 
 def silence_decision(play_map, opp_play_map) :
-    if play_map['silence_cooldown'] == 0 and play_map['search_size'] < opp_play_map['search_size'] :
+    if (play_map['silence_cooldown'] == 0   and (play_map['search_size'] < FLOOR['torpedo'] 
+        or play_map['search_size'] < opp_play_map['search_size'])) :
         position = play_map['position']
         direction_list = tools['manhattan']
         length_list = [1,2,3,4]
@@ -486,6 +490,11 @@ def update_play_map(play_map, opp_play_map) :
     if play_map.get('next_direction_path') :
         play_map['next_direction'] = play_map['next_direction_path'][0]
     
+    if not play_map['search_size'] :
+        play_map['direction_path'].pop(-1)        
+        play_map['direction_path'].pop(-1)
+        
+    
     play_map.update({
     'direction_path_length'    : len(play_map['direction_path']),
     'direction_path_extending' : extending(play_map['direction_path']),
@@ -495,12 +504,7 @@ def update_play_map(play_map, opp_play_map) :
     
     if play_map['me'] or DEBUG :
         play_map['target'] = config_target(play_map, opp_play_map)
-        
-        """
-        heat_map_array = heat_map_1(play_map['arr_search_map'])
-        play_map['opp_heat_map'] = array_to_dic(heat_map_array)
-        """
-        
+
         play_map['opp_heat_map'] = heat_map_1(play_map['arr_search_map'])
      
     play_map = check_last_tiles(play_map)
@@ -550,10 +554,8 @@ def next_tile(play_map) :
         try_ += 1
         open_1 = test_time(temp_play_map) or last_try
     
-    """
     if not play_map['start'] :
         play_map = next_tile_security(play_map)
-    """
     
     if TEST['next_tile'] : return metrics
     if DSPL['search_map'] and play_map['me'] : display_search_map(test)
@@ -615,6 +617,7 @@ def heat_map_1(search_map) :
     kernel = np.array([[0  , 0.8,   0], [0.8,   0, 0.8], [0  , 0.8,   0]])
     for _ in range(14) :
         search_map += convolve2d(search_map,kernel,mode='same', boundary='fill')
+        for x,y in MAP['island'] : search_map[x][y] = 0
     search_map = search_map / search_map.max()
     search_map = np.round(search_map,3)
     return search_map
