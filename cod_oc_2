@@ -16,7 +16,7 @@ MESSAGE = True
 
 # instruction
 MSG = {'his_search_map' : True}
-MOD = {'no_silence' : True}
+MOD = {'no_silence' : True, 'cut_path' : True}
 OPT = {'sampling' : True, 'start' : True, 'game_loop' : True, 'one_path' : True}
 SHOW = {'island' : False, 'path' : False, 'time' : False}
 TEST = {'heat_map' : False, 'next_tile' : False, 'random_path' : False}
@@ -26,10 +26,10 @@ DFLT = {'next_tile_security' : False, 'check_search_map' : False, 'torpedo' : Fa
 # constant
 MAP = {'torpedo' : 5, 'size' : 15}
 COOLDOWN = {'torpedo' : 3, 'sonar' : 4, 'silence' : 6, 'mine' : int(),}
-TIME = { 'start' : 0.65, 'start_limit' : 0.999, 'turn' : 0.025, 'turn_limit' : 0.049, 'search_map' : 0.004, 'heat_map' : 0.0055} # delet heat_map
+TIME = { 'start' : 0.80, 'start_limit' : 0.9999, 'turn' : 0.03, 'turn_limit' : 0.0499, 'search_map' : 0.004, 'turn_max' : 0.035} # delet heat_map
 FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12, 'torpedo_pwr' : 36, 'silence_pwr' : 36, 'silence_tiles' : 36}
-NUM = {'length' : 10, 'test' : 60, 'laps' : 40, 'sampling' : 0.1, 'heat_map' : 14}  
-            
+NUM = {'length' : 12, 'test' : 60, 'laps' : 40, 'sampling' : 0.1, 'heat_map' : 10}  
+
 # verifier que les com correspondent
         
 def main():
@@ -187,9 +187,9 @@ def i_play(my_play_map, his_play_map) :
         order = 'SURFACE'
         sector = tile_sector_converter(my_play_map['position'])
         my_play_map = surface_play_map(my_play_map, sector)
-    elif silence_decision(my_play_map, his_play_map) :
+    if not order :
         order, my_play_map = silence_decision(my_play_map, his_play_map)
-    else :
+    if not order :
         # pas bien fait parce qu'on modifie direction path, position ... avant d'avoir appliquer l'order.
         # move
         time_move = perf_counter()
@@ -205,13 +205,12 @@ def i_play(my_play_map, his_play_map) :
         time_torpedo = round(perf_counter() - time_torpedo, 3)
         # mine
         order += mine_decision()
-        # message
-        order += add_message(my_play_map, his_play_map)
         # sonar
         my_play_map = sonar_decision(my_play_map, his_play_map) 
         if my_play_map['sonar'] : order += f" | SONAR {my_play_map['sonar']}"
         # evaluer silence
-
+        
+    order += add_message(my_play_map, his_play_map)
         
     if DEBUG : print(f"my order  : '{order}'")
     else : print(order)
@@ -225,7 +224,7 @@ def surface_decision(play_map) :
     neighbor_tiles = update_path(play_map['position'], tools['manhattan'])
     surface = True
     for tile in neighbor_tiles :
-        if not blocking(tile, play_map,  lap) : surface = False
+        if not blocking(tile, play_map) : surface = False
     return surface
 
 
@@ -273,6 +272,7 @@ def sonar_decision(my_play_map, his_play_map) :
 
 def silence_decision(play_map, opp_play_map) :
     global DFLT
+    order = ''
     if (play_map['silence_cooldown'] == 0   and (play_map['search_size'] < FLOOR['torpedo'] 
         or play_map['search_size'] < opp_play_map['search_size'])) :
         DFLT['silence'] = True
@@ -295,9 +295,7 @@ def silence_decision(play_map, opp_play_map) :
                         if play_map.get('last_tiles') != None : 
                             play_map['last_tiles'] = [*play_map['last_tiles'], *tile_path]
                     else : play_map['silence'] = True
-                    return order, play_map
-        else : return False
-    else : return False
+    return order, play_map
 
 " truc machin bidul"
 
@@ -487,11 +485,6 @@ def update_play_map(play_map, opp_play_map) :
     if play_map.get('next_direction_path') :
         play_map['next_direction'] = play_map['next_direction_path'][0]
     
-    if not play_map['search_size'] and len(play_map['direction_path']) > 2 :
-        play_map['direction_path'].pop(-1)        
-        play_map['direction_path'].pop(-1)
-        
-    
     play_map.update({
     'direction_path_length'    : len(play_map['direction_path']),
     'direction_path_extending' : extending(play_map['direction_path']),
@@ -617,9 +610,10 @@ def config_target(play_map, opp_play_map) :
 def heat_map_1(search_map) :
     
     kernel = np.array([[0  , 0.8,   0], [0.8,   0, 0.8], [0  , 0.8,   0]])
-    for _ in range(14) :
+    for _ in range(NUM['heat_map']) :
         search_map += convolve2d(search_map,kernel,mode='same', boundary='fill')
         for x,y in MAP['island'] : search_map[x][y] = 0
+        if test_time(heat_map = True) : break
     search_map = search_map / search_map.max()
     search_map = np.round(search_map,3)
     return search_map
@@ -633,7 +627,7 @@ def scatter(temp_play_map) :
     sector_value = math.log(temp_play_map['sector_size'] + 1, 10)
     length_value = math.sin(temp_play_map['next_direction_path_length'] * (math.pi / 2) / NUM['length'])
     scatter_value = temp_play_map['scatter']
-    return 0.30*spread_value + 0.30*sector_value + 0.15*length_value + 0.25*scatter_value
+    return 0.25*spread_value + 0.25*sector_value + 0.25*length_value + 0.25*scatter_value
 
 
 def hunting(temp_play_map, play_map) :
@@ -685,7 +679,12 @@ def config_search_map(play_map) :
                 
         probability = round(positiv_result / tested_tile, 2)
         
-        if probability > 0.9 - poll_rate or not non_tested or test_time(search_map = True):
+        if probability > 0.9 - poll_rate or not non_tested or test_time(search_map = True) :
+            
+            if MOD['cut_path'] :
+                if not play_map['search_size'] or test_time(search_map = True) :
+                    play_map = cut_path(play_map)
+            
             for tile in non_tested : 
                 play_map['search_map'][tile] = probability
                 temp_sector_search.append(tile_sector_converter(tile))
@@ -713,6 +712,17 @@ def sampling(play_map) :
         non_tested, sample = [], play_map['search_area']
     else : non_tested, sample  = train_test_split(play_map['search_area'], test_size = FLOOR['sampling'])
     return non_tested, sample
+
+
+def cut_path(play_map) :
+    if len(play_map['direction_path']) > 2 :
+        play_map['direction_path'] = play_map['direction_path'][:-2]
+        play_map.update({ 'direction_path_length'    : len(play_map['direction_path']),
+                          'direction_path_extending' : extending(play_map['direction_path']),
+                          'fork' : list(idx for idx,dir_ in enumerate(play_map['direction_path']) 
+                                        if len(dir_)>1) })
+        
+    return play_map
 
 def run_path(tile, play_map) :
     if off_side_max(tile, play_map['direction_path_extending']) and not TEST['random_path'] : return 0.00 
@@ -881,23 +891,26 @@ def test_time(play_map = None, main = None, start = None, heat_map = False, sear
     if play_map and main == None : main = play_map['main'] 
     if play_map and start == None : play_map['start'] 
     
-    if main and start :
-        test = perf_counter() - time < TIME['start_limit'] 
-        if not test : raise Exception(f'time_out : {perf_counter() - time}')
-    elif main and not start:
-        test = perf_counter() - time < TIME['turn_limit']
-        if not test : raise Exception(f'time_out : {perf_counter() - time}')
-    elif not main and start :
-        test = perf_counter() - time < TIME['start'] 
-    elif not main and not start and not heat_map :
-        test = perf_counter() - time < TIME['turn']
-    elif heat_map : 
-        test = perf_counter() - time < TIME['heat_map']
+    if heat_map : 
+        test = perf_counter() - time > TIME['turn_max']
     elif search_map :
         test = perf_counter() - sm_time > TIME['search_map']
+    else : 
+        if main and start :
+            test = perf_counter() - time < TIME['start_limit'] 
+            if not test : raise Exception(f'time_out : {perf_counter() - time}')
+        elif main and not start:
+            test = perf_counter() - time < TIME['turn_limit']
+            if not test : raise Exception(f'time_out : {perf_counter() - time}')
+        elif not main and start :
+            test = perf_counter() - time < TIME['start'] 
+        elif not main and not start :
+            test = perf_counter() - time < TIME['turn']
+
     return test
     
 # direction_path
+
 
 def dic_to_array(dic) :
     array = np.array([[dic.get(x,y) if dic.get(x,y) != None else 0 for x in range(MAP['size'])] 
