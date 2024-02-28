@@ -27,7 +27,8 @@ DFLT = {'next_tile_security' : False, 'check_search_map' : False, 'torpedo' : Fa
 MAP = {'torpedo' : 5, 'size' : 15}
 COOLDOWN = {'torpedo' : 3, 'sonar' : 4, 'silence' : 6, 'mine' : int(),}
 TIME = { 'start' : 0.80, 'start_limit' : 0.9999, 'turn' : 0.03, 'turn_limit' : 0.0499, 'search_map' : 0.004, 'turn_max' : 0.035} # delet heat_map
-FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12, 'torpedo_pwr' : 36, 'silence_pwr' : 36, 'silence_tiles' : 36}
+FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12, 'heat_map' : 125, 'torpedo_pwr' : 36, 'silence_pwr' : 36, 
+         'silence_tiles' : 36}
 NUM = {'length' : 12, 'test' : 60, 'laps' : 40, 'sampling' : 0.1, 'heat_map' : 10}  
 
 # verifier que les com correspondent
@@ -47,8 +48,8 @@ def main():
     
     ___('end')
 
-" STEP OF THE GAME "
 
+" STEP OF THE GAME "
 
 def start() :
     
@@ -90,8 +91,8 @@ def game_loop(my_play_map, his_play_map) :
         ___('turn_lap')
         if loop(my_play_map, his_play_map) : break
 
-" GAME LOOP "
 
+" GAME LOOP "
 
 def game_input(my_play_map, his_play_map) :
     
@@ -178,8 +179,9 @@ def degraded_mode_silence(play_map, next_direction = [(0,0)]) :
     
     return play_map
 
-# relger heat_map aussi (c'est plus facile)
+
 def i_play(my_play_map, his_play_map) :
+    
     global order, time_move, time_torpedo
     order = str()
     
@@ -221,6 +223,7 @@ def i_play(my_play_map, his_play_map) :
 
 
 def surface_decision(play_map) :
+    
     neighbor_tiles = update_path(play_map['position'], tools['manhattan'])
     surface = True
     for tile in neighbor_tiles :
@@ -229,6 +232,7 @@ def surface_decision(play_map) :
 
 
 def power_decision(my_play_map, his_play_map) :
+    
     silence_power = False if my_play_map['search_size'] > FLOOR['silence_pwr'] else True
     torpedo_power = False if his_play_map['search_size'] > FLOOR['torpedo_pwr'] else True
     if silence_power and my_play_map['silence_cooldown'] > 0 : power = 'SILENCE'
@@ -242,6 +246,7 @@ def power_decision(my_play_map, his_play_map) :
 
 
 def torpedo_decision(my_play_map, his_play_map) :
+    
     order = ''
     if his_play_map['search_size'] < FLOOR['torpedo'] and my_play_map['torpedo_cooldown'] == 0 :
         DFLT['torpedo'] = True
@@ -258,10 +263,12 @@ def torpedo_decision(my_play_map, his_play_map) :
 
 
 def mine_decision() :
+    
     return ''
 
 
 def sonar_decision(my_play_map, his_play_map) :
+    
     if my_play_map['sonar_cooldown'] > 0 or my_play_map['sector_size'] < 3: sector = 0
     else :
         if his_play_map['search_size'] > FLOOR['sonar'] :
@@ -271,6 +278,7 @@ def sonar_decision(my_play_map, his_play_map) :
     return my_play_map
 
 def silence_decision(play_map, opp_play_map) :
+    
     global DFLT
     order = ''
     if (play_map['silence_cooldown'] == 0   and (play_map['search_size'] < FLOOR['torpedo'] 
@@ -296,6 +304,7 @@ def silence_decision(play_map, opp_play_map) :
                             play_map['last_tiles'] = [*play_map['last_tiles'], *tile_path]
                     else : play_map['silence'] = True
     return order, play_map
+
 
 " truc machin bidul"
 
@@ -365,9 +374,11 @@ def ___(com) :
     elif com == 'end' : 
         print("end")
 
+
 " PLAY MAP"
 
 def init_play_map(me, start) :
+    
     play_map = {'me'                        : me,
                 'main'                      : True, # 'main' : his_play_map, my_play_map / temp : temp_play_map
                 'start'                     : start,
@@ -422,6 +433,7 @@ def init_play_map(me, start) :
     return play_map
 
 def config_temp_play_map(play_map, position, next_direction_path, next_direction) :
+    
     temp_play_map =  {  'main'                          : False,
                         'start'                         : play_map['start'],
                         'position'                      : position,
@@ -436,17 +448,20 @@ def config_temp_play_map(play_map, position, next_direction_path, next_direction
                         'search_size'                   : play_map['search_size'],
                         'arr_search_map'                : play_map['arr_search_map'],
                         
-                        'sector_search'                 : list(),
-                        'sector_size'                   : int(),
+                        'sector_search'                 : play_map['sector_search'],
+                        'sector_size'                   : play_map['sector_size'],
+                        'sector_mod'                    : play_map['sector_mod'],
+                        'scatter'                       : play_map['scatter'],
                         
-                        'scatter'                       : float(),
                         'value'                         : int(),
                         
                         'keys_list'                     : list()}
     temp_play_map['keys_list'] = list(temp_play_map)
     return temp_play_map
 
+
 def surface_play_map(play_map, sector) :
+    
     play_map.update({  'next_direction'  : [(0,0)],
                        'direction_path'  : list(),
                        'sector_in'       : {lap : sector},
@@ -456,7 +471,9 @@ def surface_play_map(play_map, sector) :
         play_map.update({ 'last_tiles' : list() })
     return play_map
 
+
 def update_play_map(play_map, opp_play_map) :
+    
     # checking :
     for key in play_map : 
         if key not in play_map['keys_list'] : raise Exception(f"unknown keys in play_map : {key}")
@@ -489,21 +506,24 @@ def update_play_map(play_map, opp_play_map) :
     
     if play_map['me'] or DEBUG :
         play_map['target'] = config_target(play_map, opp_play_map)
-
-        play_map['opp_heat_map'] = heat_map_1(play_map['arr_search_map'])
+        play_map['opp_heat_map'] = heat_map_1(play_map, opp_play_map)
      
     play_map = check_last_tiles(play_map)
     return play_map
 
 def check_last_tiles(play_map) :
+    
     if play_map.get('last_tiles') != None :
         if play_map['position'] not in play_map['last_tiles'] : 
             play_map['last_tiles'].append(play_map['position'])
     return play_map
 
+
 " NEXT TILE"
 
+
 def next_tile(play_map) :
+    
     try_, test_value, value = 0, -1, -1
     metrics, test = {}, {}
     last_try = all([play_map['next_direction_path'], play_map['next_direction'], play_map['position']])
@@ -552,7 +572,9 @@ def next_tile(play_map) :
         play_map['last_tiles'].append(play_map['position'])
     return play_map
 
+
 def random_path(play_map) :
+    
     direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
     onset_tile = play_map.get('position') if play_map.get('position') else random.choice(play_map['search_area'])
     
@@ -602,12 +624,14 @@ def config_target(play_map, opp_play_map) :
     return round((0.5 * life_ratio + scatter_ratio) / 1.5 , 2)
 
 
-def heat_map_1(search_map) :
-    
+def heat_map_1(play_map, opp_play_map) :
+    if opp_play_map['search_size'] > FLOOR['heat_map'] : return np.zeros((MAP['size'], MAP['size']))
+    search_map = opp_play_map['arr_search_map']
+    impediment = ([*MAP['island'], *play_map['last_tiles']] if play_map.get('last_tiles') else MAP['island'])
     kernel = np.array([[0  , 0.8,   0], [0.8,   0, 0.8], [0  , 0.8,   0]])
     for _ in range(NUM['heat_map']) :
         search_map += convolve2d(search_map,kernel,mode='same', boundary='fill')
-        for x,y in MAP['island'] : search_map[x][y] = 0
+        for x,y in impediment : search_map[x][y] = 0
         if test_time(heat_map = True) : break
     search_map = search_map / search_map.max()
     search_map = np.round(search_map,3)
@@ -643,20 +667,26 @@ def next_tile_security(play_map) :
         DFLT['next_tile_security'] = True
         for direction in tools['manhattan'] :
             tile = add_tuple(play_map['position'], direction)
-            if not blocking(tile) :
+            if not blocking(tile, play_map) :
                 play_map['next_direction'] = direction
                 return play_map
 
+
 " SEARCH MAP"
 
-def config_search_map(play_map) : 
-    sm_timer()      
+def config_search_map(play_map) :
+    sm_timer()     
+    
+    if not play_map['direction_path'] : return play_map
+    
+    renew_search_map(play_map)
+    
+    if not play_map['main'] and not play_map['search_size'] and MOD['cut_path'] :
+        degraded_search_map(play_map)
+        return play_map
+    
     positiv_result, tested_tile = 0, 0
     poll_rate = NUM['sampling']
-    if play_map['main'] : 
-        play_map['search_area'] = MAP['sea']
-        play_map['search_size'] = MAP['sea_size']
-        play_map['arr_search_map'] = np.zeros((MAP['size'], MAP['size']))
     temp_search_area, temp_sector_search = [], []
     while True :
         
@@ -680,6 +710,10 @@ def config_search_map(play_map) :
             if MOD['cut_path'] :
                 if not play_map['search_size'] or test_time(search_map = True) :
                     play_map = cut_path(play_map)
+                    
+            if MOD['cut_path'] and not play_map['search_size']:
+                degraded_search_map(play_map)
+                return play_map
             
             for tile in non_tested : 
                 play_map['search_map'][tile] = probability
@@ -703,12 +737,30 @@ def config_search_map(play_map) :
             play_map['search_size'] = len(play_map['search_area'])
             poll_rate += NUM['sampling']
 
+def renew_search_map(play_map) :
+    if play_map['main'] : 
+        play_map['search_area'] = MAP['sea']
+        play_map['search_size'] = MAP['sea_size']
+        play_map['arr_search_map'] = np.zeros((MAP['size'], MAP['size']))
+    return play_map
+
+def degraded_search_map(play_map) :
+    search_area = sector_tile_converter(play_map['sector_mod'])
+    play_map.update({'search_area'    : search_area,
+                     'search_size'    : len(search_area),
+                      'sector_search' : play_map['sector_mod'],
+                      'sector_size'   : 1, 
+                      'scatter'       : 1 - round(len(search_area) / MAP['sea_size'], 2)})
+    play_map['arr_search_map'] = np.zeros((MAP['size'], MAP['size']))
+    for x,y in play_map['search_area'] : play_map['arr_search_map'][y][x] = 1
+    play_map['search_map'] = { tile : 1 if tile in play_map['search_area'] else 0 for tile in MAP['sea']}  
+    return play_map
+    
 def sampling(play_map) :
-    if play_map['start'] or play_map['search_size'] < FLOOR['sampling'] or not OPT['sampling'] :
+    if play_map['start'] or play_map['search_size'] <= FLOOR['sampling'] or not OPT['sampling'] :
         non_tested, sample = [], play_map['search_area']
     else : non_tested, sample  = train_test_split(play_map['search_area'], test_size = FLOOR['sampling'])
     return non_tested, sample
-
 
 def cut_path(play_map) :
     if len(play_map['direction_path']) > 2 :
@@ -717,10 +769,11 @@ def cut_path(play_map) :
                           'direction_path_extending' : extending(play_map['direction_path']),
                           'fork' : list(idx for idx,dir_ in enumerate(play_map['direction_path']) 
                                         if len(dir_)>1) })
-        
     return play_map
 
+
 def run_path(tile, play_map) :
+    
     if off_side_max(tile, play_map['direction_path_extending']) and not TEST['random_path'] : return 0.00 
     fork_map = copy.deepcopy(config_fork_map(play_map))
     cursor = initial_cursor(play_map, fork_map, tile)    
@@ -751,6 +804,7 @@ def run_path(tile, play_map) :
                 return search_map
         cursor = update_cursor(cursor, play_map, fork_map)
 
+
 # cursor
 
 def initial_cursor(play_map, fork_map, tile) :
@@ -766,6 +820,7 @@ def initial_cursor(play_map, fork_map, tile) :
 
 
 def update_cursor (cursor, play_map, fork_map) :
+    
     cursor['idx'] += 1
     cursor['lap'] = lap - cursor['idx'] if play_map['main'] else None
     branch_index = (fork_map['fork'][cursor['idx']] 
@@ -775,7 +830,9 @@ def update_cursor (cursor, play_map, fork_map) :
     cursor['tile'] = add_tuple(cursor['tile'], cursor['dir'])
     return cursor
 
+
 def stop(fork_map) :
+    
     if len(fork_map['fork']) != len(fork_map['max']) : 
         raise ValueError('fork_map')
     if (len(fork_map['fork']) == 1 and 
@@ -783,9 +840,11 @@ def stop(fork_map) :
         return True
     else : return False
 
+
 # fork_map
 
 def config_fork_map (play_map) :
+    
     # how fork_map is built :
     fork_map = {'fork' : {}, 'max' : {}, 'fork-index': {}, 'index-fork' : {}}
     if play_map.get('fork') :
@@ -798,13 +857,17 @@ def config_fork_map (play_map) :
             index += 1
     return fork_map
 
+
 def del_fork_map (fork_map, fork) :
+    
     index = fork_map['fork-index'][fork] 
     for cursor in ['fork', 'max', 'fork-index'] : del fork_map[cursor][fork]
     del fork_map['index-fork'][index]
     return fork_map
 
-def update_fork_map(fork, fork_map): 
+
+def update_fork_map(fork, fork_map) : 
+    
     fork_map['fork'][fork] += 1
     while fork_map['fork'][fork] > fork_map['max'][fork] :
         index = fork_map['fork-index'][fork]
@@ -816,9 +879,11 @@ def update_fork_map(fork, fork_map):
         except KeyError : break
     return fork_map
 
+
 " GAME MAP"
 
 def config_map() :
+    
     global i_start, MAP
     tiles, island, sea = [], [], []
     if not DEBUG :
@@ -853,15 +918,18 @@ def config_map() :
     i_start = True if not my_id else False
     MAP.update({'tiles' : tiles, 'island' : island, 'sea' : sea, 'sea_size' : len(sea)})
 
+
 " TOOLS"
 
-def config_global_var():
+def config_global_var() :
     global tools
-    tools = {'manhattan'      : [[(1,0)], [(-1,0)], [(0,1)], [(0,-1)]],
-             'euclidean'      : [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)],
-             'silence_tiles'  : list(set([(x,0) for x in range(-4,5) if x != 0] + [(0,y) for y in range(-4,5) if y != 0])),
-             'torpedo_tiles'  : [(x,y) for x in range(-4, 5) for y in range(-4, 5) if abs(x) + abs(y) <= 4 and (x != 0 or y!= 0)]
-            }
+    tools = {'manhattan'     : [[(1,0)], [(-1,0)], [(0,1)], [(0,-1)]],
+             'euclidean'     : [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,1),(1,0),(1,-1)],
+             'silence_tiles' : list(set([(x,0) for x in range(-4,5) if x != 0] + [(0,y) for y in range(-4,5) if y != 0])),
+             'torpedo_tiles' : [(x,y) for x in range(-4, 5) for y in range(-4, 5) if abs(x) + abs(y) <= 4 and (x != 0 or y!= 0)],
+             'sector'        : {'1' : [ 0, 5, 0, 5], '4' : [ 0, 5, 5,10], '7' : [ 0, 5,10,15],
+                                '2' : [ 5,10, 0, 5], '5' : [ 5,10, 5,10], '8' : [ 5,10,10,15],
+                                '3' : [10,15, 0, 5], '6' : [10,15, 5,10], '9' : [10,15,10,15]}}
     return tools
 
 # time
@@ -974,12 +1042,14 @@ def off_side_tile (tile) :
     return (x not in range(0,size) or y not in range(0,size))
 
 def tile_sector_converter(xy) :
-    sector = {'1': [ 0, 5, 0, 5], '4' : [ 0, 5, 5,10], '7' : [ 0, 5,10,15],
-              '2': [ 5,10, 0, 5], '5' : [ 5,10, 5,10], '8' : [ 5,10,10,15],
-              '3': [10,15, 0, 5], '6' : [10,15, 5,10], '9' : [10,15,10,15]}
+    sector = tools['sector']
     for i in '123456789' :
         if sector[i][0] <= xy[0] < sector[i][1] and sector[i][2] <= xy[1] < sector[i][3] : 
             return int(i)
+def sector_tile_converter(sector) :  
+    min_x, max_x, min_y, max_y = tools['sector'][str(sector)]
+    result = [(x,y) for x in range(min_x, max_x) for y in range(min_y, max_y) if (x,y) not in MAP['island']]
+    return result
 
 def normal_law(x,s2,mu): # nouveau
     sigma = math.sqrt(s2)     
@@ -1023,6 +1093,7 @@ def torpedo_area(ref_position) :
             range_ -= 1
             path.pop(-1)
 
+
 "MESSAGE CONTEXT"
 
 def add_message(my_play_map, his_play_map) :
@@ -1042,6 +1113,7 @@ def add_message(my_play_map, his_play_map) :
         if order == " | MSG " : order = ''  
     else : order = ''
     return order
+
 
 "DEBUG" 
 
@@ -1142,6 +1214,8 @@ def check_search_map() :
         
         test = all( true_result[label][tile] == test_play_map['search_map'][tile] 
                    for tile in test_play_map['search_map'])
+         # supprimer arr_search_map quand on aura changer ça
+         
         if DSPL['check_search_map'] : 
             print(f"test {label} : {test}\n")
             display_search_map(test_play_map)
@@ -1207,6 +1281,7 @@ def display_search_map(test_play_map) :
             try : line.append(f"_{int(test_play_map['search_map'][x,y])}" 
                               if test_play_map['search_map'][x,y] >= 1 or test_play_map['search_map'][x,y] == 0
                               else f"{int(test_play_map['search_map'][x,y]*100):02}")
+                                # supprimer arr_search_map quand on aura changer ça
             except KeyError : line.append('XX')
         print(*line, sep=' ') 
     print(f"positive rate : {test_play_map['scatter']} sample_size : {test_play_map['search_size']}\n")
@@ -1336,13 +1411,14 @@ def test_heat_map() :
                         opp_play_map['search_map'][tile] = 1
                     else : opp_play_map['search_map'][tile] = 0
                 else : non_tested.append(tile)
+                # supprimer search_map quand on aura changer ça
             
             try : positive_rate = round( positive_result / tested, 1)
             except : positive_rate = 0
             opp_play_map['scatter'] = 1 - positive_rate
-            # comprend rien à revoir
+            # comprend rien à revoir suprimer arr_search_map quand on aura changer ça.
             for tile in non_tested : opp_play_map['search_map'][tile] = positive_rate
-            opp_play_map['search_area'] = [*tested_and_positive, *non_tested]
+            opp_play_map['search_area'] = [*tested_and_positive, *non_tested] # ça marche plus
             
             timer()
             # config_heat_map(opp_play_map)
@@ -1364,6 +1440,7 @@ def test_heat_map() :
     plt.show()
     
     print(f"mean time : {round(stat.mean(time_test), 4)}, max time : {round(max(time_test), 4)}")
+
 
 " START "
 
