@@ -19,7 +19,7 @@ MSG = {'his_search_map' : True}
 MOD = {'no_silence' : True, 'cut_path' : True}
 OPT = {'sampling' : True, 'start' : True, 'game_loop' : True, 'one_path' : True}
 SHOW = {'island' : False, 'path' : False, 'time' : False}
-TEST = {'heat_map' : False, 'next_tile' : True, 'random_path' : False}
+TEST = {'heat_map' : False, 'next_tile' : False, 'random_path' : False}
 DSPL = {'check_search_map' : False, 'run_path' : False, 'path' : False , 'search_map' : False}
 DFLT = {'next_tile_security' : False, 'check_search_map' : False, 'torpedo' : False, 'silence' : False} # do not touch
 
@@ -27,7 +27,7 @@ DFLT = {'next_tile_security' : False, 'check_search_map' : False, 'torpedo' : Fa
 MAP = {'torpedo' : 5, 'size' : 15}
 COOLDOWN = {'torpedo' : 3, 'sonar' : 4, 'silence' : 6, 'mine' : int(),}
 TIME = { 'start' : 0.8000, 'start_limit' : 1.000, 'turn' : 0.0280, 'turn_limit' : 0.05, 'search_map' : 0.0040, 'turn_max' : 0.0350} # delet heat_map
-FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 12, 'heat_map' : 125, 'torpedo_pwr' : 36, 'silence_pwr' : 36, 
+FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 36, 'heat_map' : 125, 'torpedo_pwr' : 72, 'silence_pwr' : 36, 
          'silence_tiles' : 36}
 NUM = {'length' : 10, 'test' : 60, 'laps' : 40, 'sampling' : 0.1, 'heat_map' : 10}  
 
@@ -225,12 +225,10 @@ def i_play(my_play_map, his_play_map) :
 
 
 def surface_decision(play_map) :
-    
     neighbor_tiles = update_path(play_map['position'], tools['manhattan'])
-    surface = True
     for tile in neighbor_tiles :
-        if not blocking(tile, play_map) : surface = False
-    return surface
+        if not blocking(tile, play_map) : return False
+    return True
 
 
 def power_decision(my_play_map, his_play_map) :
@@ -510,7 +508,7 @@ def update_play_map(play_map, opp_play_map) :
     
     if play_map['me'] or DEBUG :
         play_map['target'] = config_target(play_map, opp_play_map)
-        play_map['opp_heat_map'] = heat_map_1(play_map, opp_play_map)
+        play_map['opp_heat_map'] = heat_map(play_map, opp_play_map)
      
     play_map = check_last_tiles(play_map)
     return play_map
@@ -579,9 +577,8 @@ def next_tile(play_map) :
 
 def random_path(play_map) :
     
-    direction = [ [(1,0)], [(-1,0)], [(0,1)], [(0,-1)] ]
+    direction = tools['manhattan']
     onset_tile = play_map.get('position') if play_map.get('position') else random.choice(play_map['search_area'])
-    
     open_1 = True
     while open_1 == True :
         current_direction_path = []
@@ -593,6 +590,8 @@ def random_path(play_map) :
         open_2 = True
         while open_2 == True :
             temp_direction = random.choice(direction)
+            direction = tools['manhattan'].copy()
+            direction.remove(reverse_direction(temp_direction))
             temp_tile = add_tuple(current_tile, temp_direction)
             if temp_tile not in current_tile_path and not blocking(temp_tile, play_map) :
                 if first_direction == None : first_direction = temp_direction
@@ -628,14 +627,14 @@ def config_target(play_map, opp_play_map) :
     return round((0.5 * life_ratio + scatter_ratio) / 1.5 , 2)
 
 
-def heat_map_1(play_map, opp_play_map) :
+def heat_map(play_map, opp_play_map) :
     
     if opp_play_map['search_size'] > FLOOR['heat_map'] : return np.zeros((MAP['size'], MAP['size']))
     search_map = opp_play_map['arr_search_map']
     impediment = ([*MAP['island'], *play_map['last_tiles']] if play_map.get('last_tiles') else MAP['island'])
     kernel = np.array([[0  , 0.9,   0], [0.9,   0, 0.9], [0  , 0.9,   0]])
     for _ in range(NUM['heat_map']) :
-        search_map += convolve2d(search_map,kernel,mode='same', boundary='fill')
+        search_map += convolve2d(search_map,kernel,mode='same', boundary='symm')
         for x,y in impediment : search_map[x][y] = 0
         if test_time(heat_map = True) : break
     search_map = search_map / search_map.max()
@@ -1442,7 +1441,7 @@ def test_heat_map() :
             timer()
             # config_heat_map(opp_play_map)
             search_map_array = dic_to_array(opp_play_map['search_map'])
-            heat_map_array = heat_map_1(search_map_array)
+            heat_map_array = heat_map(search_map_array)
             array_to_dic(heat_map_array)
             
             time_test.append( (perf_counter() - time))
