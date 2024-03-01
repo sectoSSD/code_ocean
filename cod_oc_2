@@ -8,28 +8,14 @@ from sklearn.model_selection import train_test_split
 from time import perf_counter
 from scipy.signal import convolve2d
 
-
-# progblème général : les array exprime tout en y, x, j'exprime tout en x, y cf : tolist()
-# problème particulier : continuer ci dessous :
-"""
-MAP = {'size' : 15}
-island = [(14,7),(13,7),(13,8),(13,9),(13,10),(1,7),(1,8),(1,9),(1,10)]
-kernel = np.array([[0  , 1,   0], [1,  0, 1], [0  , 1,   0]])
-last_tiles = []
-for i in range(1,3) :
-    arr_search_map = np.ones((MAP['size'],MAP['size']))
-    temp = [*island, *last_tiles]
-    for x,y in temp : 
-        if (x,y) == (8,14) : print('flag')
-        arr_search_map[y][x] = 0
-    print(arr_search_map)
-    arr_search_map = convolve2d(arr_search_map,kernel,mode='same', boundary='fill', fillvalue = 0)
-    if np.argwhere(arr_search_map == 1).tolist() :
-        temp = np.argwhere(arr_search_map == 1).tolist()
-        temp = list(map(lambda yx : tuple(yx), temp))
-        last_tiles.append(*temp)
-    print(last_tiles)    
-"""
+# creer dans MAP[arr_island] avec 1 pour island
+# creer MAP[arr_blocking] travailler 
+# creer un play_map['map'] soit == à MAP[array] soit travailler
+# modifier blocking  pour qu'il prenne en charge ...
+# supprimer last_tiles de heat_map
+# verifier tous les last_tiles et les supprimmer
+# supprimer le système de suppression des last_tiles
+# ...
 
 "MENU"
 
@@ -53,8 +39,6 @@ FLOOR = {'sampling' : 56, 'sonar' : 75, 'torpedo' : 36, 'heat_map' : 125, 'torpe
          'silence_tiles' : 36}
 NUM = {'length' : 10, 'test' : 60, 'laps' : 40, 'sampling' : 0.1, 'heat_map' : 10}  
 
-# verifier que les com correspondent
-        
 def main():
     
     ___('init')
@@ -1020,7 +1004,7 @@ def dic_to_array(dic) :
     return array.astype(np.float32)
 
 def array_to_dic(array) :
-    dictionnary = {(x,y) : array[x][y] for x,y in MAP['sea']}
+    dictionnary = {(x,y) : array[y][x] for x,y in MAP['sea']}
     return dictionnary
 
 def add_tuple(tuple_1, tuple_2) :
