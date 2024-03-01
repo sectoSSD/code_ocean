@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from time import perf_counter
 from scipy.signal import convolve2d
 
-# creer dans MAP[arr_island] avec 1 pour island
+### creer dans MAP[arr_island] avec 1 pour island
 # creer MAP[arr_blocking] travailler 
 # creer un play_map['map'] soit == à MAP[array] soit travailler
 # modifier blocking  pour qu'il prenne en charge ...
@@ -16,6 +16,41 @@ from scipy.signal import convolve2d
 # verifier tous les last_tiles et les supprimmer
 # supprimer le système de suppression des last_tiles
 # ...
+
+# tadinnnn !!!
+
+"""
+def arr_blocking() :
+    MAP = {'size' : 15}
+    
+    #island
+    island = [(14,7),(13,7),(13,8),(13,9),(13,10),(1,7),(1,8),(1,9),(1,10)]
+    island = list(tile[::-1] for tile in island) # invert : x,y island in y,x :
+    print(island)
+    
+    #start_array == ENTRY
+    start_array = arr_search_map = np.ones((MAP['size'],MAP['size']))
+    for y,x in island : start_array[y][x] = 0 
+    
+    # array_search_map == CREATING TEMP
+    arr_last_tiles = start_array.copy()
+    
+    # kernel
+    kernel = np.array([[0  , 1,   0], [1,  0, 1], [0  , 1,   0]])
+    
+    last_tiles = []
+    prev_last_tiles = None
+    while True :
+        impediment = [*island, *last_tiles]
+        temp_array = convolve2d(arr_last_tiles,kernel,mode='same', boundary='fill', fillvalue = 0)  
+        last_tiles = np.argwhere(temp_array == 1).tolist()
+        last_tiles = list(tuple(tile) for tile in last_tiles if tuple(tile) not in impediment)
+        print(last_tiles)
+        if not last_tiles : return arr_last_tiles
+        for y,x in last_tiles : arr_last_tiles[y][x] = 0
+
+print(arr_blocking())
+"""
 
 "MENU"
 
@@ -183,8 +218,8 @@ def degraded_mode_silence(play_map, next_direction = [(0,0)]) :
                        'sector_out'      : dict()})
     
     if tiles : 
-        play_map.update({'sector_tiles' : {lap : list(map(lambda xy : tuple(xy), tiles))} }) 
-    
+        play_map.update({'sector_tiles' : {lap : list(t[::-1] for t in tiles)} }) 
+
     return play_map
 
 
@@ -904,7 +939,6 @@ def update_fork_map(fork, fork_map) :
 " GAME MAP"
 
 def config_map() :
-    
     global i_start, MAP
     tiles, island, sea = [], [], []
     if not DEBUG :
@@ -937,7 +971,11 @@ def config_map() :
         sea = [xy for xy in tiles if xy not in island]
     if SHOW['island'] and DEBUG and not DFLT['check_search_map'] : print(f"island : {island}")
     i_start = True if not my_id else False
-    MAP.update({'tiles' : tiles, 'island' : island, 'sea' : sea, 'sea_size' : len(sea)})
+    arr_island = np.zeros((size,size))
+    for x,y in island  : arr_island[y][x] = 1
+    
+    MAP.update({'tiles' : tiles, 'island' : island, 'arr_island' : arr_island, 
+                'sea' : sea, 'sea_size' : len(sea)})
 
 
 " TOOLS"
