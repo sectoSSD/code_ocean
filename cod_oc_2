@@ -26,22 +26,29 @@ def arr_blocking() :
     #island
     island = [(14,7),(13,7),(13,8),(13,9),(13,10),(1,7),(1,8),(1,9),(1,10)]
     island = list(tile[::-1] for tile in island) # invert : x,y island in y,x :
-    print(island)
+    
+    # last_tiles
+    prev_last_tiles = [(7,5),(7,6),(7,7),(7,8),(8,8),(9,8),(9,7),(9,6),(9,5),(9,4)]
+    prev_last_tiles = list(tile[::-1] for tile in prev_last_tiles) # invert : x,y island in y,x :
+    
+    # NEED LIST OF ISLAND AND LAST_TILES !
     
     #start_array == ENTRY
     start_array = arr_search_map = np.ones((MAP['size'],MAP['size']))
     for y,x in island : start_array[y][x] = 0 
-    
+    for y,x in prev_last_tiles : start_array[y][x] = 0 
+        
     # array_search_map == CREATING TEMP
     arr_last_tiles = start_array.copy()
     
     # kernel
     kernel = np.array([[0  , 1,   0], [1,  0, 1], [0  , 1,   0]])
     
+    impediment = [*island, *prev_last_tiles]
     last_tiles = []
-    prev_last_tiles = None
+    
     while True :
-        impediment = [*island, *last_tiles]
+        impediment = [ *impediment, *last_tiles]
         temp_array = convolve2d(arr_last_tiles,kernel,mode='same', boundary='fill', fillvalue = 0)  
         last_tiles = np.argwhere(temp_array == 1).tolist()
         last_tiles = list(tuple(tile) for tile in last_tiles if tuple(tile) not in impediment)
@@ -50,6 +57,7 @@ def arr_blocking() :
         for y,x in last_tiles : arr_last_tiles[y][x] = 0
 
 print(arr_blocking())
+
 """
 
 "MENU"
