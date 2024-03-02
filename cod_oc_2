@@ -8,55 +8,22 @@ from sklearn.model_selection import train_test_split
 from time import perf_counter
 from scipy.signal import convolve2d
 
-### creer dans MAP[arr_island] avec 1 pour island
-# creer MAP[arr_blocking] travailler 
-# creer un play_map['map'] soit == à MAP[array] soit travailler
-# modifier blocking  pour qu'il prenne en charge ...
-# supprimer last_tiles de heat_map
-# verifier tous les last_tiles et les supprimmer
-# supprimer le système de suppression des last_tiles
-# ...
-
-# tadinnnn !!!
-
 """
-def arr_blocking() :
-    MAP = {'size' : 15}
-    
-    #island
-    island = [(14,7),(13,7),(13,8),(13,9),(13,10),(1,7),(1,8),(1,9),(1,10)]
-    island = list(tile[::-1] for tile in island) # invert : x,y island in y,x :
-    
-    # last_tiles
-    prev_last_tiles = [(7,5),(7,6),(7,7),(7,8),(8,8),(9,8),(9,7),(9,6),(9,5),(9,4)]
-    prev_last_tiles = list(tile[::-1] for tile in prev_last_tiles) # invert : x,y island in y,x :
-    
-    # NEED LIST OF ISLAND AND LAST_TILES !
-    
-    #start_array == ENTRY
-    start_array = arr_search_map = np.ones((MAP['size'],MAP['size']))
-    for y,x in island : start_array[y][x] = 0 
-    for y,x in prev_last_tiles : start_array[y][x] = 0 
-        
-    # array_search_map == CREATING TEMP
-    arr_last_tiles = start_array.copy()
-    
-    # kernel
-    kernel = np.array([[0  , 1,   0], [1,  0, 1], [0  , 1,   0]])
-    
-    impediment = [*island, *prev_last_tiles]
-    last_tiles = []
-    
-    while True :
-        impediment = [ *impediment, *last_tiles]
-        temp_array = convolve2d(arr_last_tiles,kernel,mode='same', boundary='fill', fillvalue = 0)  
-        last_tiles = np.argwhere(temp_array == 1).tolist()
-        last_tiles = list(tuple(tile) for tile in last_tiles if tuple(tile) not in impediment)
-        print(last_tiles)
-        if not last_tiles : return arr_last_tiles
-        for y,x in last_tiles : arr_last_tiles[y][x] = 0
+Quand je reprendra le code ...
 
-print(arr_blocking())
+Outre direction général dans cod_oc 3 sur git_hub ...
+
+Amélierer silence_décision() qui, outre la decision, emet un play_map['search_map'] qui ne prend pas en compte 
+les islands
+
+Le ciblage sur search_map marche très bien et donne souvent l'endroit exacte ou se trouve l'opposant. Mais mon 
+soum est souvent trop loin et ne s'approche pas suffisament. C'EST PAR UNE MEILLEUR CHASSE QU'ON PROGRESSERA'
+                    _ Faut_til simplement passer NUM['heat_map] à 14 ?
+                    _ reevaluaer target pour qu'il soit plus agressif'
+                    _ hunting ?
+
+Si je suis en danger d'être frapper par une tropille (donc que mon search_map est très faible) il peut être 
+util de faire surface
 
 """
 
@@ -215,19 +182,14 @@ def degraded_mode_silence(play_map, next_direction = [(0,0)]) :
               [0,0,0,0,1,0,0,0,0]]    
     
     new_arr_search_map = convolve2d(play_map['arr_search_map'],kernel,mode='same', boundary='fill')
-    
-    tiles = ( np.argwhere(new_arr_search_map != 0).tolist() 
-              if len(np.argwhere(new_arr_search_map < 1).tolist()) < FLOOR['silence_tiles'] 
-              else 0 )
+    for y,x in MAP['arr_island'] : new_arr_search_map[y][x] = 0
     
     play_map.update({  'next_direction'  : next_direction,
                        'direction_path'  : list(),
                        'sector_in'       : dict(),
                        'sector_out'      : dict()})
-    
-    if tiles : 
-        play_map.update({'sector_tiles' : {lap : list(t[::-1] for t in tiles)} }) 
 
+    play_map.update({'sector_tiles' : {lap : new_arr_search_map} }) 
     return play_map
 
 
@@ -275,8 +237,12 @@ def i_play(my_play_map, his_play_map) :
 
 def surface_decision(play_map) :
     neighbor_tiles = update_path(play_map['position'], tools['manhattan'])
+    """
     for tile in neighbor_tiles :
         if not blocking(tile, play_map) : return False
+    """
+    for x,y in neighbor_tiles :
+        if not off_side_tile((x,y)) and play_map['free'][y,x] : return False
     return True
 
 
@@ -299,15 +265,16 @@ def torpedo_decision(my_play_map, his_play_map) :
     order = ''
     if his_play_map['search_size'] < FLOOR['torpedo'] and my_play_map['torpedo_cooldown'] == 0 :
         DFLT['torpedo'] = True
-        torpedo = torpedo_area(my_play_map['position'])
         my_area = update_path(my_play_map['position'], tools['euclidean'])
-        for tile in his_play_map['search_area'] :
-            if tile in torpedo and tile not in my_area : 
-                ttx, tty = tile
-                if type(ttx) is not int or type(tty) is not int : raise Exception("i_play()/torpedo_target : not int")
-                order = f" | TORPEDO {ttx} {tty}"
-                my_play_map['sector_tiles'].update({lap : torpedo})
-                break
+        my_area = [tile[::-1] for tile in my_area]
+        torpedo = torpedo_area(my_play_map['position'])
+        search_map = his_play_map['arr_search_map']
+        torpedo_tiles = np.argwhere((torpedo == 1) & (search_map == 1)).tolist()
+        torpedo_tiles = [tile for tile in torpedo_tiles if tile not in my_area]
+        if torpedo_tiles : 
+            ttx, tty = random.choice(torpedo_tiles)
+            order = f" | TORPEDO {ttx} {tty}"
+            my_play_map['sector_tiles'].update({lap : torpedo})
     return order, my_play_map
 
 
@@ -352,6 +319,15 @@ def silence_decision(play_map, opp_play_map) :
                         play_map = degraded_mode_silence(play_map, next_direction)
                         if play_map.get('last_tiles') != None : 
                             play_map['last_tiles'] = [*play_map['last_tiles'], *tile_path]
+                        arr_tile_path = [tile[::-1] for tile in tile_path] 
+                        if play_map.get('arr_last_tiles') != None : 
+                            play_map['arr_last_tiles'] = [*play_map['arr_last_tiles'], 
+                                                          *arr_tile_path]
+                        if play_map.get('free') is not None : 
+                            for y,x in arr_tile_path : play_map['free'][y,x] = 0
+                        if play_map.get('blocking') is not None : 
+                            for y,x in arr_tile_path : play_map['blocking'][y,x] = 0
+                            play_map['blocking'] = arr_blocking(play_map)
                     else : play_map['silence'] = True
     return order, play_map
 
@@ -472,7 +448,11 @@ def init_play_map(me, start) :
                          'target'                    : int(),
                          'opp_heat_map'              : np.zeros((MAP['size'],MAP['size'])),
                          'position'                  : tuple(),
+                         
+                         'arr_last_tiles'            : list(),
                          'last_tiles'                : list(),
+                         'blocking'                  : MAP['blocking'].copy(),
+                         'free'                      : MAP['arr_map'].copy(),
                 
                          'next_direction_path'       : list(),
                          'max_length_direction_path' : int()})
@@ -517,9 +497,15 @@ def surface_play_map(play_map, sector) :
                        'direction_path'  : list(),
                        'sector_in'       : {lap : sector},
                        'sector_out'      : dict(),
-                       'sector_tiles'    : dict()})
+                       'sector_tiles'    : {lap : play_map['arr_search_map']}})
     if play_map.get('last_tiles') :
         play_map.update({ 'last_tiles' : list() })
+    if play_map.get('arr_last_tiles') :
+        play_map.update({ 'arr_last_tiles' : list() })
+    if play_map.get('blocking') is not None :
+        play_map.update({ 'blocking' : MAP['blocking'].copy()})
+    if play_map.get('free') is not None :
+        play_map.update({ 'free' : MAP['arr_map'].copy()})
     return play_map
 
 
@@ -568,6 +554,16 @@ def check_last_tiles(play_map) :
     if play_map.get('last_tiles') != None :
         if play_map['position'] not in play_map['last_tiles'] : 
             play_map['last_tiles'].append(play_map['position'])
+    if play_map.get('arr_last_tiles') != None :
+        arr_position = play_map['position'][::-1]
+        if arr_position not in play_map['arr_last_tiles'] : 
+            play_map['arr_last_tiles'].append(arr_position)
+        if play_map.get('blocking').any() :
+            y, x = arr_position
+            play_map['blocking'][y][x] = 0
+            play_map['blocking'] = arr_blocking(play_map)
+        if play_map.get('free') is not None :
+            play_map['free'][y][x] = 0
     return play_map
 
 
@@ -621,6 +617,7 @@ def next_tile(play_map) :
     if play_map['start'] : 
         play_map['position'] = random.choice(ref_search_area)
         play_map['last_tiles'].append(play_map['position'])
+        # ca bug pas sans arr_last_tiles ... supprimer ??
     return play_map
 
 
@@ -680,11 +677,11 @@ def heat_map(play_map, opp_play_map) :
     
     if opp_play_map['search_size'] > FLOOR['heat_map'] : return np.zeros((MAP['size'], MAP['size']))
     search_map = opp_play_map['arr_search_map']
-    impediment = ([*MAP['island'], *play_map['last_tiles']] if play_map.get('last_tiles') else MAP['island'])
+    impediment = ([*MAP['arr_island'], *play_map['arr_last_tiles']] if play_map.get('arr_last_tiles') else MAP['arr_island'])
     kernel = np.array([[0  , 0.9,   0], [0.9,   0, 0.9], [0  , 0.9,   0]])
     for _ in range(NUM['heat_map']) :
         search_map += convolve2d(search_map,kernel,mode='same', boundary='symm')
-        for x,y in impediment : search_map[y][x] = 0
+        for y,x in impediment : search_map[y][x] = 0
         if test_time(heat_map = True) : break
     if search_map.max() : search_map = search_map / search_map.max()
     search_map = np.round(search_map,3)
@@ -721,8 +718,8 @@ def next_tile_security(play_map) :
     else :
         DFLT['next_tile_security'] = True
         for direction in tools['manhattan'] :
-            tile = add_tuple(play_map['position'], direction)
-            if not blocking(tile, play_map) :
+            x,y = add_tuple(play_map['position'], direction)
+            if not off_side_tile((x,y)) and play_map['free'][y][x] :
                 play_map['next_direction'] = direction
                 return play_map
 
@@ -780,7 +777,7 @@ def config_search_map(play_map) :
             play_map['search_area'] = [*temp_search_area, *non_tested]
             play_map['search_size'] = len(play_map['search_area'])
             
-            if temp_sector_search and play_map['main'] : 
+            if temp_sector_search and play_map['main'] :
                 play_map['sector_mod'] = stat.mode(temp_sector_search)
             temp_sector_search = list(set(temp_sector_search))
             play_map['sector_search'] = temp_sector_search
@@ -979,11 +976,39 @@ def config_map() :
         sea = [xy for xy in tiles if xy not in island]
     if SHOW['island'] and DEBUG and not DFLT['check_search_map'] : print(f"island : {island}")
     i_start = True if not my_id else False
-    arr_island = np.zeros((size,size))
-    for x,y in island  : arr_island[y][x] = 1
     
-    MAP.update({'tiles' : tiles, 'island' : island, 'arr_island' : arr_island, 
-                'sea' : sea, 'sea_size' : len(sea)})
+    arr_map = np.ones((size,size))
+    for x,y in island  : arr_map[y][x] = 0
+    
+    arr_island = list(tile[::-1] for tile in island)
+    
+    blocking = arr_blocking(None, arr_map, arr_island)
+    
+    MAP.update({'tiles' : tiles, 'island' : island, 'arr_island' : arr_island, 'arr_map' : arr_map, 
+                'blocking' : blocking, 'sea' : sea, 'sea_size' : len(sea)})
+
+
+def arr_blocking(play_map = None, array = None, arr_island = None) :
+    
+    if not play_map :
+        island = arr_island
+        prev_last_tiles = list()
+        blocking = array.copy()
+    else :
+        island = MAP['arr_island']
+        prev_last_tiles = play_map['arr_last_tiles']
+        blocking = play_map['blocking'].copy() 
+        
+    kernel = np.array([[0  , 1,   0], [1,  0, 1], [0  , 1,   0]])
+    impediment = [*island, *prev_last_tiles]
+    last_tiles = []
+    
+    while True :
+        impediment = [ *impediment, *last_tiles]
+        temp_array = convolve2d(blocking,kernel,mode='same', boundary='fill', fillvalue = 0)  
+        last_tiles = np.argwhere((temp_array == 1) & (blocking == 1)).tolist()
+        if not last_tiles : return blocking
+        for y,x in last_tiles : blocking[y][x] = 0
 
 
 " TOOLS"
@@ -1124,21 +1149,38 @@ def normal_law(x,s2,mu): # nouveau
     return (1 / (sigma * math.sqrt(2 * math.pi))) * math.exp((-1 / 2) * (((x - mu)/sigma) ** 2))
 
 def blocking(tile, play_map = None, index = None) :
-    blocking = tile in MAP['island'] or off_side_tile(tile)
-    if not blocking and play_map and play_map.get('last_tiles') :
-        blocking = tile in play_map.get('last_tiles')  
+    blocking =  off_side_tile(tile)
+    x,y = tile
+    if not blocking :
+        if play_map and play_map.get('blocking') is not None : 
+            blocking = not play_map['blocking'][y][x]
+        else : blocking = not MAP['arr_map'][y][x]
     if not blocking and play_map and play_map['main'] and index != None :
         current_sector = tile_sector_converter(tile)
         if not blocking and play_map['sector_in'].get(index) :
             blocking =  play_map['sector_in'].get(index) != current_sector
         if not blocking and play_map['sector_out'].get(index) :
             blocking = current_sector == play_map['sector_out'].get(index)
-        if not blocking and play_map['sector_tiles'].get(index) :
-            blocking = tile not in play_map['sector_tiles'].get(index)
+        if not blocking and play_map['sector_tiles'].get(index) is not None :
+            blocking = bool(play_map['sector_tiles'][index][y, x] == 0)
     return blocking
 
 # sector and area
 
+def torpedo_area(ref_position) :
+    torpedo_area = np.zeros( (MAP['size'],MAP['size']) )
+    x,y = ref_position
+    torpedo_area[y][x] = 1
+
+    kernel = [[0,1,0],[1,0,1],[0,1,0]]
+    for _ in range(4) :
+        temp_array = convolve2d(torpedo_area,kernel,mode='same', boundary='fill', fillvalue = 0)  
+        new_tiles = np.argwhere((temp_array > 0) & (torpedo_area == 0) & (MAP['arr_map'] == 1) ).tolist()
+        for y,x in new_tiles : torpedo_area[y][x] = 1
+    return torpedo_area
+
+
+"""
 def torpedo_area(ref_position) :
     if type(ref_position) is not tuple : raise Exception('bad settings')
     path = [ref_position]
@@ -1147,7 +1189,9 @@ def torpedo_area(ref_position) :
     while True :
         run = False
         for cursor in update_path(path[-1], tools['manhattan']) :
-            if cursor in torpedo_area or blocking(cursor) or range_ == MAP['torpedo'] : continue
+            x,y = cursor
+            if not off_side_tile(cursor) or cursor in torpedo_area or not MAP['arr_map'][y][x] or range_ == MAP['torpedo'] : 
+                continue
             else :
                 run = True
                 range_ += 1
@@ -1160,6 +1204,7 @@ def torpedo_area(ref_position) :
                 return torpedo_area
             range_ -= 1
             path.pop(-1)
+"""
 
 
 "MESSAGE CONTEXT"
@@ -1255,7 +1300,7 @@ def check_search_map() :
     true_result = { 
         'surface'    : {  xy   : 1 if tile_sector_converter(xy) == 2 else 0 for xy in MAP['sea'] },
         'sector_out'   : {  xy   : 0 if tile_sector_converter(xy) == 2 else 1 for xy in MAP['sea'] },
-        'torpedo'      : {  xy   : 1 if xy in torpedo_area((10,7)) else 0 for xy in MAP['sea'] },
+        'torpedo'      : {  (x,y)   : torpedo_area((10,7))[y,x] for x,y in MAP['sea'] },
         'silence'      : silence_result(),
         'E'            : { (x,y) : 0 if x != 0  or 5 < y < 9 else 1 for x,y in MAP['sea'] },
         'W'            : { (x,y) : 0 if x != 14 or 5 < y < 9 else 1 for x,y in MAP['sea'] },
