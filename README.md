@@ -3,17 +3,13 @@ here is the script of a codingame project intended to compete in a competition c
 
 url: https://www.codingame.com/multiplayer/bot-programming/ocean-of-code
 
+This script is the seconde version of the projet. I made it to improve my level of python programation and that’s why I decided to make it from scratch. It was a bit naive and I realized rather towards the end that 
+I would not be among the best if I did not use libraries to allow the codes to go faster. Indeed ocean of code is a turn-based game with a time limit. Full python programming is too slow to play intelligently in the 
+allotted time. We need numpy, pandas and perhaps even scikitlearn...
 
+A third version is expected with these solutions and with the use of classes for more efficient code. 
 
-
-
-
-
-
-
-
-
-
+Here is some main concept of the script :
 
 Direction : 'MOVE Direction' is the main action possible in the game. To be read in a two dimensional 
             map each direction are translated in a tuple (x,y) :
