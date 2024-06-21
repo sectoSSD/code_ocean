@@ -1,4 +1,20 @@
-Good to know :
+
+here is the script of a codingame project intended to compete in a competition called "ocean of code".
+
+url: https://www.codingame.com/multiplayer/bot-programming/ocean-of-code
+
+
+
+
+
+
+
+
+
+
+
+
+
 Direction : 'MOVE Direction' is the main action possible in the game. To be read in a two dimensional 
             map each direction are translated in a tuple (x,y) :
             'S' -> [( 0, 1)]
