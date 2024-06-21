@@ -9,7 +9,7 @@ alowed time. We need numpy, pandas and perhaps even scikitlearn...
 
 A third version is expected with these solutions and with the use of classes for more efficient code. 
 
-Here is some main concept of the script :
+Here is some main concept of the script (you nedd to switch in code version to read it with the tabulation):
 
 Direction : 'MOVE Direction' is the main action possible in the game. To be read in a two dimensional 
             map each direction are translated in a tuple (x,y) :
